@@ -4,8 +4,21 @@ using UnityEngine;
 public class EnemyChase : MonoBehaviour
 {
     [Header("Persecución")]
-    [SerializeField] private float stoppingDistance = 1.2f;
-    [SerializeField] private float moveSpeedMultiplier = 0.8f;
+    [Tooltip("El enemigo persigue hasta que los colliders físicos impiden seguir avanzando.")]
+    [SerializeField] private float stoppingDistance = 0f;
+
+    [Tooltip("Velocidad del enemigo cuando el jugador lo está mirando y está lejos.")]
+    [SerializeField] private float cautiousSpeedMultiplier = 0.5f;
+
+    [Tooltip("Distancia muy cercana al jugador donde el enemigo se vuelve agresivo.")]
+    [SerializeField] private float aggressiveDistance = 1.8f;
+
+    [Tooltip("Velocidad del enemigo cuando ataca de cerca o el jugador le da la espalda.")]
+    [SerializeField] private float aggressiveSpeedMultiplier = 0.9f;
+
+    [Header("Visión del jugador")]
+    [Tooltip("Ángulo total del campo de visión frontal del jugador.")]
+    [SerializeField] private float playerVisionAngle = 90f;
 
     [Header("Daño por contacto")]
     [SerializeField] private float contactDamage = 30f;
@@ -21,13 +34,18 @@ public class EnemyChase : MonoBehaviour
     private Transform player;
     private PlayerHealth playerHealth;
     private PlayerMovement playerMovement;
+    private EnemyHealth enemyHealth;
 
     private float damageCooldownTimer;
     private float enemyKnockbackTimer;
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
+        rb =
+            GetComponent<Rigidbody>();
+
+        enemyHealth =
+            GetComponent<EnemyHealth>();
 
         rb.constraints =
             RigidbodyConstraints.FreezeRotationX |
@@ -63,6 +81,34 @@ public class EnemyChase : MonoBehaviour
 
         playerMovement =
             playerObject.GetComponent<PlayerMovement>();
+
+        if (playerMovement == null)
+        {
+            Debug.LogWarning(
+                "[EnemyChase] El Player no tiene PlayerMovement."
+            );
+        }
+    }
+
+    public void ResetChaseState()
+    {
+        damageCooldownTimer =
+            contactDamageCooldown;
+
+        enemyKnockbackTimer =
+            0f;
+
+        if (rb != null)
+        {
+            if (rb.isKinematic)
+                return;
+
+            rb.linearVelocity =
+                Vector3.zero;
+
+            rb.angularVelocity =
+                Vector3.zero;
+        }
     }
 
     private void FixedUpdate()
@@ -70,12 +116,18 @@ public class EnemyChase : MonoBehaviour
         if (player == null)
             return;
 
-        // Si el enemigo está muerto, no hacemos nada más.
+        if (enemyHealth != null &&
+            !enemyHealth.IsAlive)
+            return;
+
         if (rb.isKinematic)
             return;
 
-        damageCooldownTimer -= Time.fixedDeltaTime;
-        enemyKnockbackTimer -= Time.fixedDeltaTime;
+        damageCooldownTimer -=
+            Time.fixedDeltaTime;
+
+        enemyKnockbackTimer -=
+            Time.fixedDeltaTime;
 
         if (enemyKnockbackTimer > 0f)
             return;
@@ -85,20 +137,28 @@ public class EnemyChase : MonoBehaviour
 
     private void PerseguirJugador()
     {
-        // Seguridad adicional por si el Rigidbody cambia a Kinematic.
+        if (enemyHealth != null &&
+            !enemyHealth.IsAlive)
+            return;
+
         if (rb.isKinematic)
             return;
 
-        Vector3 direction =
-            player.position - transform.position;
+        Vector3 directionToPlayer =
+            player.position -
+            transform.position;
 
-        direction.y = 0f;
+        directionToPlayer.y =
+            0f;
 
         float distance =
-            direction.magnitude;
+            directionToPlayer.magnitude;
 
         if (distance <= stoppingDistance)
         {
+            if (rb.isKinematic)
+                return;
+
             rb.linearVelocity =
                 new Vector3(
                     0f,
@@ -109,9 +169,10 @@ public class EnemyChase : MonoBehaviour
             return;
         }
 
-        direction.Normalize();
+        directionToPlayer.Normalize();
 
-        float playerSpeed = 6f;
+        float playerSpeed =
+            6f;
 
         if (playerMovement != null)
         {
@@ -119,20 +180,99 @@ public class EnemyChase : MonoBehaviour
                 playerMovement.MoveSpeed;
         }
 
+        bool playerIsLookingAtEnemy =
+            EstaJugadorMirandoAlEnemigo();
+
+        float speedMultiplier;
+
+        if (!playerIsLookingAtEnemy)
+        {
+            speedMultiplier =
+                aggressiveSpeedMultiplier;
+        }
+        else if (distance <= aggressiveDistance)
+        {
+            speedMultiplier =
+                aggressiveSpeedMultiplier;
+        }
+        else
+        {
+            speedMultiplier =
+                cautiousSpeedMultiplier;
+        }
+
         float enemySpeed =
-            playerSpeed * moveSpeedMultiplier;
+            playerSpeed *
+            speedMultiplier;
 
         Vector3 velocity =
-            direction * enemySpeed;
+            directionToPlayer *
+            enemySpeed;
+
+        if (rb.isKinematic)
+            return;
 
         velocity.y =
             rb.linearVelocity.y;
+
+        if (rb.isKinematic)
+            return;
 
         rb.linearVelocity =
             velocity;
     }
 
-    private void OnCollisionEnter(Collision collision)
+    private bool EstaJugadorMirandoAlEnemigo()
+    {
+        if (playerMovement == null)
+            return false;
+
+        Vector3 playerFacingDirection =
+            playerMovement.Direction;
+
+        playerFacingDirection.y =
+            0f;
+
+        if (playerFacingDirection.sqrMagnitude < 0.01f)
+        {
+            return false;
+        }
+
+        playerFacingDirection.Normalize();
+
+        Vector3 directionToEnemy =
+            transform.position -
+            player.position;
+
+        directionToEnemy.y =
+            0f;
+
+        if (directionToEnemy.sqrMagnitude < 0.01f)
+        {
+            return true;
+        }
+
+        directionToEnemy.Normalize();
+
+        float dot =
+            Vector3.Dot(
+                playerFacingDirection,
+                directionToEnemy
+            );
+
+        float visionLimit =
+            Mathf.Cos(
+                playerVisionAngle *
+                0.5f *
+                Mathf.Deg2Rad
+            );
+
+        return dot >= visionLimit;
+    }
+
+    private void OnCollisionEnter(
+        Collision collision
+    )
     {
         if (player == null)
             return;
@@ -146,7 +286,9 @@ public class EnemyChase : MonoBehaviour
         AplicarGolpe();
     }
 
-    private void OnCollisionStay(Collision collision)
+    private void OnCollisionStay(
+        Collision collision
+    )
     {
         if (player == null)
             return;
@@ -162,6 +304,14 @@ public class EnemyChase : MonoBehaviour
 
     private void AplicarGolpe()
     {
+        if (enemyHealth != null &&
+            !enemyHealth.IsAlive)
+            return;
+
+        if (rb == null ||
+            rb.isKinematic)
+            return;
+
         if (playerHealth == null)
             return;
 
@@ -174,17 +324,17 @@ public class EnemyChase : MonoBehaviour
         damageCooldownTimer =
             contactDamageCooldown;
 
-        // Daño
         playerHealth.RecibirDaño(
             contactDamage,
             DamageType.Physical
         );
 
-        // Dirección desde el enemigo hacia el jugador
         Vector3 knockbackDirection =
-            player.position - transform.position;
+            player.position -
+            transform.position;
 
-        knockbackDirection.y = 0f;
+        knockbackDirection.y =
+            0f;
 
         if (knockbackDirection.sqrMagnitude < 0.01f)
         {
@@ -194,39 +344,49 @@ public class EnemyChase : MonoBehaviour
 
         knockbackDirection.Normalize();
 
-        // Pequeño retroceso del jugador
         Rigidbody playerRb =
             player.GetComponent<Rigidbody>();
 
-        if (playerRb != null)
-        {
-            Vector3 playerVelocity =
-                knockbackDirection * playerKnockback;
+        if (playerRb != null &&
+    !playerRb.isKinematic)
+{
+    Vector3 playerVelocity =
+        knockbackDirection *
+        playerKnockback;
 
-            playerVelocity.y =
-                knockbackUpward;
+    playerVelocity.y =
+        knockbackUpward;
 
-            playerRb.linearVelocity =
-                playerVelocity;
-        }
+    playerRb.linearVelocity =
+        playerVelocity;
+}
 
-        // Retroceso del enemigo
-        // Solo si su Rigidbody sigue siendo dinámico.
-        if (!rb.isKinematic)
-        {
-            Vector3 enemyVelocity =
-                -knockbackDirection * enemyKnockback;
+        // El daño al jugador anterior podría haber
+        // provocado algún cambio de estado. Comprobamos
+        // de nuevo antes de tocar la velocidad del enemigo.
+        if (enemyHealth != null &&
+            !enemyHealth.IsAlive)
+            return;
 
-            enemyVelocity.y =
-                knockbackUpward;
+        if (rb == null ||
+            rb.isKinematic)
+            return;
 
-            rb.linearVelocity =
-                enemyVelocity;
+        Vector3 enemyVelocity =
+            -knockbackDirection *
+            enemyKnockback;
 
-            // Impide que la persecución cancele inmediatamente el retroceso.
-            enemyKnockbackTimer =
-                enemyKnockbackDuration;
-        }
+        enemyVelocity.y =
+            knockbackUpward;
+
+        if (rb.isKinematic)
+            return;
+
+        rb.linearVelocity =
+            enemyVelocity;
+
+        enemyKnockbackTimer =
+            enemyKnockbackDuration;
 
         Debug.Log(
             "[EnemyChase] Golpe de contacto + retroceso."

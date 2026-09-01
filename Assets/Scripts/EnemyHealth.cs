@@ -19,6 +19,11 @@ public class EnemyHealth : MonoBehaviour
     private Rigidbody rb;
 
     private Color originalColor;
+
+    private Vector3 initialPosition;
+    private Quaternion initialRotation;
+    private Vector3 initialScale;
+
     private bool isDead;
 
     public float Health => currentHealth;
@@ -28,6 +33,15 @@ public class EnemyHealth : MonoBehaviour
     private void Awake()
     {
         currentHealth = maxHealth;
+
+        initialPosition =
+            transform.position;
+
+        initialRotation =
+            transform.rotation;
+
+        initialScale =
+            transform.localScale;
 
         enemyRenderer =
             GetComponentInChildren<Renderer>();
@@ -147,6 +161,8 @@ public class EnemyHealth : MonoBehaviour
 
         isDead = true;
 
+        CancelInvoke();
+
         if (enemyChase != null)
         {
             enemyChase.enabled = false;
@@ -159,8 +175,14 @@ public class EnemyHealth : MonoBehaviour
 
         if (rb != null)
         {
-            rb.linearVelocity =
-                Vector3.zero;
+            if (!rb.isKinematic)
+            {
+                rb.linearVelocity =
+                    Vector3.zero;
+
+                rb.angularVelocity =
+                    Vector3.zero;
+            }
 
             rb.isKinematic = true;
         }
@@ -182,7 +204,8 @@ public class EnemyHealth : MonoBehaviour
 
         while (elapsed < deathDuration)
         {
-            elapsed += Time.deltaTime;
+            elapsed +=
+                Time.deltaTime;
 
             float progress =
                 Mathf.Clamp01(
@@ -199,7 +222,8 @@ public class EnemyHealth : MonoBehaviour
             transform.localRotation =
                 originalRotation *
                 Quaternion.Euler(
-                    deathRotation * smoothProgress,
+                    deathRotation *
+                    smoothProgress,
                     0f,
                     0f
                 );
@@ -222,8 +246,68 @@ public class EnemyHealth : MonoBehaviour
 
         CrearExplosionPolvo();
 
-        Destroy(
-            gameObject
+        gameObject.SetActive(false);
+    }
+
+    public void ResetEnemy()
+    {
+        StopAllCoroutines();
+
+        CancelInvoke();
+
+        transform.position =
+            initialPosition;
+
+        transform.rotation =
+            initialRotation;
+
+        transform.localScale =
+            initialScale;
+
+        currentHealth =
+            maxHealth;
+
+        isDead =
+            false;
+
+        if (enemyMaterial != null)
+        {
+            enemyMaterial.color =
+                originalColor;
+        }
+
+        if (rb != null)
+        {
+            rb.isKinematic =
+                false;
+
+            rb.linearVelocity =
+                Vector3.zero;
+
+            rb.angularVelocity =
+                Vector3.zero;
+        }
+
+        if (enemyCollider != null)
+        {
+            enemyCollider.enabled =
+                true;
+        }
+
+        if (enemyChase != null)
+        {
+            enemyChase.ResetChaseState();
+
+            enemyChase.enabled =
+                true;
+        }
+
+        gameObject.SetActive(
+            true
+        );
+
+        Debug.Log(
+            $"[EnemyHealth] Enemigo restaurado: {gameObject.name}"
         );
     }
 
@@ -240,11 +324,8 @@ public class EnemyHealth : MonoBehaviour
         ParticleSystem particles =
             dust.AddComponent<ParticleSystem>();
 
-        // IMPORTANTE:
-        // Unity puede iniciar automáticamente el sistema
-        // al añadir el componente. Lo detenemos inmediatamente
-        // antes de modificar cualquier configuración.
-
+        // Aseguramos que el sistema esté completamente
+        // detenido antes de modificar su configuración.
         particles.Stop(
             true,
             ParticleSystemStopBehavior.StopEmittingAndClear
@@ -260,15 +341,18 @@ public class EnemyHealth : MonoBehaviour
             particles.shape;
 
         var particleRenderer =
-            particles.GetComponent<ParticleSystemRenderer>();
+            particles.GetComponent<
+                ParticleSystemRenderer
+            >();
 
-        // ==============================
-        // CONFIGURACIÓN
-        // ==============================
+        main.playOnAwake =
+            false;
 
-        main.playOnAwake = false;
-        main.duration = 0.35f;
-        main.loop = false;
+        main.duration =
+            0.35f;
+
+        main.loop =
+            false;
 
         main.startLifetime =
             new ParticleSystem.MinMaxCurve(
@@ -296,10 +380,14 @@ public class EnemyHealth : MonoBehaviour
                 1f
             );
 
-        main.gravityModifier = 1f;
-        main.maxParticles = 12;
+        main.gravityModifier =
+            1f;
 
-        emission.rateOverTime = 0f;
+        main.maxParticles =
+            12;
+
+        emission.rateOverTime =
+            0f;
 
         emission.SetBursts(
             new ParticleSystem.Burst[]
@@ -320,42 +408,13 @@ public class EnemyHealth : MonoBehaviour
         particleRenderer.renderMode =
             ParticleSystemRenderMode.Billboard;
 
-        // ==============================
-        // REPRODUCIR
-        // ==============================
-
         particles.Play();
 
-        StartCoroutine(
-            DestruirPolvo(
-                dust,
-                particles
-            )
-        );
-    }
-
-    private IEnumerator DestruirPolvo(
-        GameObject dust,
-        ParticleSystem particles
-    )
-    {
-        yield return new WaitForSeconds(
+        // El polvo se destruye independientemente
+        // del estado del enemigo.
+        Destroy(
+            dust,
             1f
         );
-
-        if (particles != null)
-        {
-            particles.Stop(
-                true,
-                ParticleSystemStopBehavior.StopEmittingAndClear
-            );
-        }
-
-        if (dust != null)
-        {
-            Destroy(
-                dust
-            );
-        }
     }
 }

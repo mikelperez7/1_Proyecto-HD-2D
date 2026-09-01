@@ -32,15 +32,12 @@ public class PlayerHealth : MonoBehaviour
     [Header("Vida")]
     [SerializeField] private float maxHealth = 100f;
 
-
     [Header("Respawn")]
     [SerializeField] private float respawnDelay = 1.5f;
     [SerializeField] private float respawnInvulnerabilityTime = 1f;
 
-
     [Header("Feedback de daño")]
     [SerializeField] private float damageFlashDuration = 0.15f;
-
 
     [Header("Pantalla de muerte")]
     [SerializeField] private Color deathScreenColor =
@@ -48,7 +45,6 @@ public class PlayerHealth : MonoBehaviour
 
     [SerializeField] private Color deathTextColor =
         Color.white;
-
 
     // =====================================================================
     // ESTADO
@@ -75,7 +71,6 @@ public class PlayerHealth : MonoBehaviour
 
     private bool isDead;
 
-
     // =====================================================================
     // EVENTOS
     // =====================================================================
@@ -86,13 +81,11 @@ public class PlayerHealth : MonoBehaviour
     /// </summary>
     public event Action<float> OnDamageReceived;
 
-
     /// <summary>
     /// Evento utilizado por DamageFeedbackUI.
     /// Envía cantidad y tipo de daño.
     /// </summary>
     public event Action<float, DamageType> OnDamageFeedback;
-
 
     // =====================================================================
     // PROPIEDADES
@@ -101,10 +94,8 @@ public class PlayerHealth : MonoBehaviour
     public float Health =>
         currentHealth;
 
-
     public float MaxHealth =>
         maxHealth;
-
 
     public float HealthPercent
     {
@@ -119,18 +110,15 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-
     public bool IsAlive =>
         currentHealth > 0f &&
         !isDead;
-
 
     /// <summary>
     /// Invulnerabilidad utilizada por el Dash
     /// y por la protección tras el respawn.
     /// </summary>
     public bool IsInvulnerable { get; set; }
-
 
     // =====================================================================
     // CICLO DE VIDA
@@ -147,7 +135,6 @@ public class PlayerHealth : MonoBehaviour
         isDead =
             false;
 
-
         rb =
             GetComponent<Rigidbody>();
 
@@ -157,11 +144,8 @@ public class PlayerHealth : MonoBehaviour
         dash =
             GetComponent<PlayerDash>();
 
-
-        // Buscar Renderer principal.
         playerRenderer =
             GetComponent<Renderer>();
-
 
         if (playerRenderer == null)
         {
@@ -169,10 +153,8 @@ public class PlayerHealth : MonoBehaviour
                 GetComponentInChildren<Renderer>();
         }
 
-
         if (playerRenderer != null)
         {
-            // Crear instancia propia del material.
             playerMaterial =
                 playerRenderer.material;
 
@@ -181,13 +163,20 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-
     private void Start()
     {
-        // Guardar la posición inicial como checkpoint.
         GuardarCheckpointInicial();
-    }
 
+        if (RoomResetManager.Instance == null)
+        {
+            GameObject resetManagerObject =
+                new GameObject(
+                    "RoomResetManager"
+                );
+
+            resetManagerObject.AddComponent<RoomResetManager>();
+        }
+    }
 
     // =====================================================================
     // CHECKPOINT INICIAL
@@ -201,21 +190,16 @@ public class PlayerHealth : MonoBehaviour
         respawnRotation =
             transform.rotation;
 
-
         Debug.Log(
             $"[PlayerHealth] Punto de respawn establecido en: " +
             $"{respawnPosition}"
         );
     }
 
-
     // =====================================================================
     // CHECKPOINT
     // =====================================================================
 
-    /// <summary>
-    /// Establece un nuevo checkpoint utilizando un Transform.
-    /// </summary>
     public void EstablecerCheckpoint(
         Transform checkpoint
     )
@@ -223,13 +207,11 @@ public class PlayerHealth : MonoBehaviour
         if (checkpoint == null)
             return;
 
-
         respawnPosition =
             checkpoint.position;
 
         respawnRotation =
             checkpoint.rotation;
-
 
         Debug.Log(
             $"[PlayerHealth] Nuevo checkpoint establecido en: " +
@@ -237,10 +219,6 @@ public class PlayerHealth : MonoBehaviour
         );
     }
 
-
-    /// <summary>
-    /// Establece directamente un nuevo checkpoint.
-    /// </summary>
     public void EstablecerCheckpoint(
         Vector3 position,
         Quaternion rotation
@@ -252,24 +230,16 @@ public class PlayerHealth : MonoBehaviour
         respawnRotation =
             rotation;
 
-
         Debug.Log(
             $"[PlayerHealth] Nuevo checkpoint establecido en: " +
             $"{respawnPosition}"
         );
     }
 
-
     // =====================================================================
     // RECIBIR DAÑO NORMAL
     // =====================================================================
 
-    /// <summary>
-    /// Aplica daño físico.
-    ///
-    /// Se mantiene este método para que cualquier sistema
-    /// que ya utilice RecibirDaño(float) siga funcionando.
-    /// </summary>
     public void RecibirDaño(
         float cantidad
     )
@@ -280,14 +250,10 @@ public class PlayerHealth : MonoBehaviour
         );
     }
 
-
     // =====================================================================
     // RECIBIR DAÑO POR TIPO
     // =====================================================================
 
-    /// <summary>
-    /// Aplica daño indicando su tipo.
-    /// </summary>
     public void RecibirDaño(
         float cantidad,
         DamageType damageType
@@ -296,18 +262,14 @@ public class PlayerHealth : MonoBehaviour
         if (!IsAlive)
             return;
 
-
         if (IsInvulnerable)
             return;
-
 
         if (cantidad <= 0f)
             return;
 
-
         float healthBefore =
             currentHealth;
-
 
         currentHealth =
             Mathf.Max(
@@ -315,15 +277,12 @@ public class PlayerHealth : MonoBehaviour
                 currentHealth - cantidad
             );
 
-
         float realDamage =
             healthBefore -
             currentHealth;
 
-
         if (realDamage <= 0f)
             return;
-
 
         Debug.Log(
             $"[PlayerHealth] Daño {damageType}: " +
@@ -331,41 +290,24 @@ public class PlayerHealth : MonoBehaviour
             $"Vida: {currentHealth}/{maxHealth}"
         );
 
-
-        // ================================================================
-        // HEALTH UI
-        // ================================================================
-
         OnDamageReceived?.Invoke(
             realDamage
         );
-
-
-        // ================================================================
-        // FEEDBACK VISUAL
-        // ================================================================
 
         OnDamageFeedback?.Invoke(
             realDamage,
             damageType
         );
 
-
         IniciarFeedbackDanio(
             damageType
         );
-
-
-        // ================================================================
-        // MUERTE
-        // ================================================================
 
         if (currentHealth <= 0f)
         {
             Morir();
         }
     }
-
 
     // =====================================================================
     // FEEDBACK DE COLOR DEL PERSONAJE
@@ -378,14 +320,12 @@ public class PlayerHealth : MonoBehaviour
         if (playerMaterial == null)
             return;
 
-
         if (damageFlashCoroutine != null)
         {
             StopCoroutine(
                 damageFlashCoroutine
             );
         }
-
 
         damageFlashCoroutine =
             StartCoroutine(
@@ -394,7 +334,6 @@ public class PlayerHealth : MonoBehaviour
                 )
             );
     }
-
 
     private IEnumerator FeedbackDanio(
         DamageType damageType
@@ -405,11 +344,9 @@ public class PlayerHealth : MonoBehaviour
                 damageType
             );
 
-
         yield return new WaitForSecondsRealtime(
             damageFlashDuration
         );
-
 
         if (playerMaterial != null)
         {
@@ -417,11 +354,9 @@ public class PlayerHealth : MonoBehaviour
                 originalPlayerColor;
         }
 
-
         damageFlashCoroutine =
             null;
     }
-
 
     private Color ObtenerColorDanio(
         DamageType damageType
@@ -430,6 +365,7 @@ public class PlayerHealth : MonoBehaviour
         switch (damageType)
         {
             case DamageType.Poison:
+
                 return new Color(
                     0.65f,
                     0.05f,
@@ -437,8 +373,8 @@ public class PlayerHealth : MonoBehaviour
                     1f
                 );
 
-
             case DamageType.Fire:
+
                 return new Color(
                     1f,
                     0.35f,
@@ -446,9 +382,9 @@ public class PlayerHealth : MonoBehaviour
                     1f
                 );
 
-
             case DamageType.Physical:
             default:
+
                 return new Color(
                     1f,
                     0.1f,
@@ -457,7 +393,6 @@ public class PlayerHealth : MonoBehaviour
                 );
         }
     }
-
 
     // =====================================================================
     // MUERTE
@@ -468,23 +403,16 @@ public class PlayerHealth : MonoBehaviour
         if (isDead)
             return;
 
-
         isDead =
             true;
 
         IsInvulnerable =
             false;
 
-
         Debug.Log(
             $"[PlayerHealth] ¡Jugador muerto! " +
             $"(GameObject: {gameObject.name})"
         );
-
-
-        // ================================================================
-        // BLOQUEAR MOVIMIENTO
-        // ================================================================
 
         if (movement != null)
         {
@@ -492,21 +420,11 @@ public class PlayerHealth : MonoBehaviour
                 false;
         }
 
-
-        // ================================================================
-        // BLOQUEAR DASH
-        // ================================================================
-
         if (dash != null)
         {
             dash.enabled =
                 false;
         }
-
-
-        // ================================================================
-        // DETENER RIGIDBODY
-        // ================================================================
 
         if (rb != null)
         {
@@ -520,28 +438,13 @@ public class PlayerHealth : MonoBehaviour
                 true;
         }
 
-
-        // ================================================================
-        // RESTAURAR COLOR
-        // ================================================================
-
         if (playerMaterial != null)
         {
             playerMaterial.color =
                 originalPlayerColor;
         }
 
-
-        // ================================================================
-        // PANTALLA DE MUERTE
-        // ================================================================
-
         CrearPantallaMuerte();
-
-
-        // ================================================================
-        // RESPAWN
-        // ================================================================
 
         if (respawnCoroutine != null)
         {
@@ -550,13 +453,11 @@ public class PlayerHealth : MonoBehaviour
             );
         }
 
-
         respawnCoroutine =
             StartCoroutine(
                 Respawn()
             );
     }
-
 
     // =====================================================================
     // PANTALLA DE MUERTE
@@ -567,20 +468,16 @@ public class PlayerHealth : MonoBehaviour
         if (deathScreenObject != null)
             return;
 
-
-        // ================================================================
-        // CANVAS
-        // ================================================================
-
-        deathScreenObject =
+        GameObject deathScreen =
             new GameObject(
                 "DeathScreen"
             );
 
+        deathScreenObject =
+            deathScreen;
 
         Canvas canvas =
             deathScreenObject.AddComponent<Canvas>();
-
 
         canvas.renderMode =
             RenderMode.ScreenSpaceOverlay;
@@ -588,37 +485,26 @@ public class PlayerHealth : MonoBehaviour
         canvas.sortingOrder =
             1000;
 
-
         CanvasScaler scaler =
             deathScreenObject.AddComponent<CanvasScaler>();
-
 
         scaler.uiScaleMode =
             CanvasScaler.ScaleMode.ScaleWithScreenSize;
 
-
         deathScreenObject.AddComponent<GraphicRaycaster>();
-
-
-        // ================================================================
-        // FONDO
-        // ================================================================
 
         GameObject panel =
             new GameObject(
                 "DeathScreen_Background"
             );
 
-
         panel.transform.SetParent(
             deathScreenObject.transform,
             false
         );
 
-
         RectTransform panelRect =
             panel.AddComponent<RectTransform>();
-
 
         panelRect.anchorMin =
             Vector2.zero;
@@ -632,34 +518,24 @@ public class PlayerHealth : MonoBehaviour
         panelRect.offsetMax =
             Vector2.zero;
 
-
         Image panelImage =
             panel.AddComponent<Image>();
 
-
         panelImage.color =
             deathScreenColor;
-
-
-        // ================================================================
-        // TEXTO
-        // ================================================================
 
         GameObject textObject =
             new GameObject(
                 "DeathScreen_Text"
             );
 
-
         textObject.transform.SetParent(
             deathScreenObject.transform,
             false
         );
 
-
         RectTransform textRect =
             textObject.AddComponent<RectTransform>();
-
 
         textRect.anchorMin =
             new Vector2(
@@ -688,14 +564,11 @@ public class PlayerHealth : MonoBehaviour
                 150f
             );
 
-
         Text deathText =
             textObject.AddComponent<Text>();
 
-
         deathText.text =
             "HAS MUERTO\n\nReapareciendo...";
-
 
         deathText.alignment =
             TextAnchor.MiddleCenter;
@@ -715,13 +588,11 @@ public class PlayerHealth : MonoBehaviour
         deathText.verticalOverflow =
             VerticalWrapMode.Overflow;
 
-
         deathText.font =
             Resources.GetBuiltinResource<Font>(
                 "LegacyRuntime.ttf"
             );
     }
-
 
     // =====================================================================
     // RESPAWN
@@ -733,6 +604,14 @@ public class PlayerHealth : MonoBehaviour
             respawnDelay
         );
 
+        // ================================================================
+        // REINICIAR SALA
+        // ================================================================
+
+        if (RoomResetManager.Instance != null)
+        {
+            RoomResetManager.Instance.ResetRoom();
+        }
 
         // ================================================================
         // CERRAR PANTALLA
@@ -748,7 +627,6 @@ public class PlayerHealth : MonoBehaviour
                 null;
         }
 
-
         // ================================================================
         // VOLVER AL CHECKPOINT
         // ================================================================
@@ -758,7 +636,6 @@ public class PlayerHealth : MonoBehaviour
 
         transform.rotation =
             respawnRotation;
-
 
         // ================================================================
         // RIGIDBODY
@@ -776,7 +653,6 @@ public class PlayerHealth : MonoBehaviour
                 Vector3.zero;
         }
 
-
         // ================================================================
         // RESTAURAR VIDA
         // ================================================================
@@ -787,14 +663,12 @@ public class PlayerHealth : MonoBehaviour
         isDead =
             false;
 
-
         // ================================================================
         // PROTECCIÓN DE RESPAWN
         // ================================================================
 
         IsInvulnerable =
             true;
-
 
         if (respawnProtectionCoroutine != null)
         {
@@ -803,12 +677,10 @@ public class PlayerHealth : MonoBehaviour
             );
         }
 
-
         respawnProtectionCoroutine =
             StartCoroutine(
                 ProteccionRespawn()
             );
-
 
         // ================================================================
         // RESTAURAR DASH
@@ -817,10 +689,10 @@ public class PlayerHealth : MonoBehaviour
         if (dash != null)
         {
             dash.RespawnReset();
+
             dash.enabled =
                 true;
         }
-
 
         // ================================================================
         // RESTAURAR MOVIMIENTO
@@ -832,7 +704,6 @@ public class PlayerHealth : MonoBehaviour
                 true;
         }
 
-
         // ================================================================
         // RESTAURAR COLOR
         // ================================================================
@@ -843,17 +714,14 @@ public class PlayerHealth : MonoBehaviour
                 originalPlayerColor;
         }
 
-
         respawnCoroutine =
             null;
-
 
         Debug.Log(
             $"[PlayerHealth] Respawn completado en: " +
             $"{respawnPosition}"
         );
     }
-
 
     // =====================================================================
     // PROTECCIÓN DESPUÉS DEL RESPAWN
@@ -865,14 +733,11 @@ public class PlayerHealth : MonoBehaviour
             respawnInvulnerabilityTime
         );
 
-
         IsInvulnerable =
             false;
 
-
         respawnProtectionCoroutine =
             null;
-
 
         Debug.Log(
             "[PlayerHealth] Protección de respawn terminada."
