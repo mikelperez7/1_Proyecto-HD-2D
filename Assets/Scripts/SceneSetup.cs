@@ -7,7 +7,8 @@ using UnityEditor;
 /// <summary>
 /// Script de inicialización rápida y automatizada para la escena HD-2D.
 /// Crea automáticamente el suelo, el jugador, la cámara,
-/// las trampas de veneno, las trampas de fuego y los checkpoints.
+/// las trampas de veneno, las trampas de fuego,
+/// los checkpoints y el enemigo de prueba.
 /// </summary>
 public class SceneSetup : MonoBehaviour
 {
@@ -59,7 +60,8 @@ public class SceneSetup : MonoBehaviour
 
     /// <summary>
     /// Crea el suelo, jugador, cámara,
-    /// trampas de veneno, trampas de fuego y checkpoints.
+    /// trampas de veneno, trampas de fuego,
+    /// checkpoints y enemigo.
     /// </summary>
     public static void EjecutarConfiguracion()
     {
@@ -77,6 +79,8 @@ public class SceneSetup : MonoBehaviour
         CrearTrampasFuego();
 
         CrearCheckpoints();
+
+        CrearEnemigo();
     }
 
 
@@ -103,7 +107,11 @@ public class SceneSetup : MonoBehaviour
                 Vector3.zero;
 
             ground.transform.localScale =
-                new Vector3(3f, 1f, 3f);
+                new Vector3(
+                    3f,
+                    1f,
+                    3f
+                );
         }
 
 
@@ -302,12 +310,143 @@ public class SceneSetup : MonoBehaviour
 
 
     // =====================================================================
-    // TRAMPAS DE VENENO
+    // ENEMIGO
     // =====================================================================
 
     /// <summary>
-    /// Crea varias trampas de veneno repartidas por el escenario.
+    /// Crea el enemigo de prueba.
     /// </summary>
+    private static void CrearEnemigo()
+    {
+        if (
+            GameObject.Find(
+                "Enemy_Test"
+            ) != null
+        )
+        {
+            return;
+        }
+
+
+        GameObject enemy =
+            GameObject.CreatePrimitive(
+                PrimitiveType.Cube
+            );
+
+        enemy.name =
+            "Enemy_Test";
+
+
+        enemy.transform.position =
+            new Vector3(
+                8f,
+                1f,
+                8f
+            );
+
+
+        enemy.transform.localScale =
+            new Vector3(
+                1f,
+                1f,
+                1f
+            );
+
+
+        // ================================================================
+        // MATERIAL
+        // ================================================================
+
+        Renderer renderer =
+            enemy.GetComponent<Renderer>();
+
+        if (renderer != null)
+        {
+            Material material =
+                new Material(
+                    Shader.Find(
+                        "Universal Render Pipeline/Lit"
+                    )
+                    ??
+                    Shader.Find("Standard")
+                );
+
+            material.color =
+                new Color(
+                    0.9f,
+                    0.1f,
+                    0.1f
+                );
+
+            renderer.sharedMaterial =
+                material;
+        }
+
+
+        // ================================================================
+        // RIGIDBODY
+        // ================================================================
+
+        Rigidbody rb =
+            enemy.GetComponent<Rigidbody>();
+
+        if (rb == null)
+        {
+            rb =
+                enemy.AddComponent<Rigidbody>();
+        }
+
+
+        rb.constraints =
+            RigidbodyConstraints.FreezeRotationX |
+            RigidbodyConstraints.FreezeRotationY |
+            RigidbodyConstraints.FreezeRotationZ;
+
+        rb.interpolation =
+            RigidbodyInterpolation.Interpolate;
+
+        rb.collisionDetectionMode =
+            CollisionDetectionMode.Continuous;
+
+
+        // ================================================================
+        // VIDA
+        // ================================================================
+
+        EnemyHealth health =
+            enemy.GetComponent<EnemyHealth>();
+
+        if (health == null)
+        {
+            health =
+                enemy.AddComponent<EnemyHealth>();
+        }
+
+
+        // ================================================================
+        // PERSECUCIÓN
+        // ================================================================
+
+        EnemyChase chase =
+            enemy.GetComponent<EnemyChase>();
+
+        if (chase == null)
+        {
+            chase =
+                enemy.AddComponent<EnemyChase>();
+        }
+
+
+        Debug.Log(
+            "[SceneSetup] Enemigo de prueba creado."
+        );
+    }
+
+
+    // =====================================================================
+    // TRAMPAS DE VENENO
+    // =====================================================================
+
     private static void CrearTrampasVeneno()
     {
         if (
@@ -341,9 +480,6 @@ public class SceneSetup : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// Crea una única zona visual de veneno.
-    /// </summary>
     private static void CrearTrampaVeneno(
         string nombre,
         Vector3 posicion
@@ -426,9 +562,6 @@ public class SceneSetup : MonoBehaviour
     // TRAMPAS DE FUEGO
     // =====================================================================
 
-    /// <summary>
-    /// Crea varias trampas de fuego repartidas por el escenario.
-    /// </summary>
     private static void CrearTrampasFuego()
     {
         if (
@@ -462,9 +595,6 @@ public class SceneSetup : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// Crea una única zona visual y física de fuego.
-    /// </summary>
     private static void CrearTrampaFuego(
         string nombre,
         Vector3 posicion
@@ -635,9 +765,6 @@ public class SceneSetup : MonoBehaviour
     // CHECKPOINTS
     // =====================================================================
 
-    /// <summary>
-    /// Crea cuatro checkpoints, uno en cada esquina del área jugable.
-    /// </summary>
     private static void CrearCheckpoints()
     {
         if (
@@ -748,9 +875,6 @@ public class SceneSetup : MonoBehaviour
     }
 
 
-    /// <summary>
-    /// Crea un único checkpoint.
-    /// </summary>
     private static void CrearCheckpoint(
         string nombre,
         Vector3 posicion
