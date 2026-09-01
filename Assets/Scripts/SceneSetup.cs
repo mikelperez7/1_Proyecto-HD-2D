@@ -7,7 +7,7 @@ using UnityEditor;
 /// <summary>
 /// Script de inicialización rápida y automatizada para la escena HD-2D.
 /// Crea automáticamente el suelo, el jugador, la cámara,
-/// las trampas de veneno y las trampas de fuego.
+/// las trampas de veneno, las trampas de fuego y los checkpoints.
 /// </summary>
 public class SceneSetup : MonoBehaviour
 {
@@ -59,7 +59,7 @@ public class SceneSetup : MonoBehaviour
 
     /// <summary>
     /// Crea el suelo, jugador, cámara,
-    /// trampas de veneno y trampas de fuego.
+    /// trampas de veneno, trampas de fuego y checkpoints.
     /// </summary>
     public static void EjecutarConfiguracion()
     {
@@ -75,6 +75,8 @@ public class SceneSetup : MonoBehaviour
         CrearTrampasVeneno();
 
         CrearTrampasFuego();
+
+        CrearCheckpoints();
     }
 
 
@@ -308,9 +310,6 @@ public class SceneSetup : MonoBehaviour
     /// </summary>
     private static void CrearTrampasVeneno()
     {
-        // Evitar duplicarlas si EjecutarConfiguracion()
-        // se ejecuta más de una vez.
-
         if (
             GameObject.Find(
                 "PoisonTrap_0"
@@ -370,8 +369,6 @@ public class SceneSetup : MonoBehaviour
             );
 
 
-        // Material morado
-
         Renderer renderer =
             trap.GetComponent<Renderer>();
 
@@ -402,8 +399,6 @@ public class SceneSetup : MonoBehaviour
         }
 
 
-        // Collider
-
         Collider collider =
             trap.GetComponent<Collider>();
 
@@ -414,8 +409,6 @@ public class SceneSetup : MonoBehaviour
                 true;
         }
 
-
-        // PoisonTrap
 
         PoisonTrap poison =
             trap.GetComponent<PoisonTrap>();
@@ -438,8 +431,6 @@ public class SceneSetup : MonoBehaviour
     /// </summary>
     private static void CrearTrampasFuego()
     {
-        // Evitar duplicarlas si ya existen.
-
         if (
             GameObject.Find(
                 "FireTrap_0"
@@ -488,12 +479,9 @@ public class SceneSetup : MonoBehaviour
         trap.name =
             nombre;
 
-
         trap.transform.position =
             posicion;
 
-
-        // Tamaño ligeramente menor que el veneno.
 
         float escala =
             Random.Range(
@@ -510,8 +498,6 @@ public class SceneSetup : MonoBehaviour
             );
 
 
-        // Rotación aleatoria
-
         trap.transform.rotation =
             Quaternion.Euler(
                 0f,
@@ -522,8 +508,6 @@ public class SceneSetup : MonoBehaviour
                 0f
             );
 
-
-        // Material rojo / naranja
 
         Renderer renderer =
             trap.GetComponent<Renderer>();
@@ -555,8 +539,6 @@ public class SceneSetup : MonoBehaviour
         }
 
 
-        // Collider
-
         Collider collider =
             trap.GetComponent<Collider>();
 
@@ -567,8 +549,6 @@ public class SceneSetup : MonoBehaviour
                 true;
         }
 
-
-        // FireTrap
 
         FireTrap fire =
             trap.GetComponent<FireTrap>();
@@ -648,5 +628,197 @@ public class SceneSetup : MonoBehaviour
                 player.transform
             );
         }
+    }
+
+
+    // =====================================================================
+    // CHECKPOINTS
+    // =====================================================================
+
+    /// <summary>
+    /// Crea cuatro checkpoints, uno en cada esquina del área jugable.
+    /// </summary>
+    private static void CrearCheckpoints()
+    {
+        if (
+            GameObject.Find(
+                "Checkpoint_0"
+            ) != null
+        )
+        {
+            return;
+        }
+
+
+        GameObject ground =
+            GameObject.Find(
+                "Suelo_Ground"
+            );
+
+
+        if (ground == null)
+        {
+            Debug.LogWarning(
+                "[SceneSetup] No se encontró el suelo para crear checkpoints."
+            );
+
+            return;
+        }
+
+
+        StageBounds bounds =
+            ground.GetComponent<StageBounds>();
+
+
+        if (bounds == null)
+        {
+            Debug.LogWarning(
+                "[SceneSetup] No se encontró StageBounds para crear checkpoints."
+            );
+
+            return;
+        }
+
+
+        Bounds playBounds =
+            bounds.GetPlayAreaBounds();
+
+
+        float margin =
+            2.5f;
+
+
+        float xMin =
+            playBounds.min.x + margin;
+
+        float xMax =
+            playBounds.max.x - margin;
+
+        float zMin =
+            playBounds.min.z + margin;
+
+        float zMax =
+            playBounds.max.z - margin;
+
+
+        Vector3[] posiciones =
+        {
+            new Vector3(
+                xMin,
+                0.04f,
+                zMin
+            ),
+
+            new Vector3(
+                xMax,
+                0.04f,
+                zMin
+            ),
+
+            new Vector3(
+                xMin,
+                0.04f,
+                zMax
+            ),
+
+            new Vector3(
+                xMax,
+                0.04f,
+                zMax
+            )
+        };
+
+
+        for (
+            int i = 0;
+            i < posiciones.Length;
+            i++
+        )
+        {
+            CrearCheckpoint(
+                $"Checkpoint_{i}",
+                posiciones[i]
+            );
+        }
+
+
+        Debug.Log(
+            "[SceneSetup] 4 checkpoints creados."
+        );
+    }
+
+
+    /// <summary>
+    /// Crea un único checkpoint.
+    /// </summary>
+    private static void CrearCheckpoint(
+        string nombre,
+        Vector3 posicion
+    )
+    {
+        GameObject checkpoint =
+            GameObject.CreatePrimitive(
+                PrimitiveType.Cube
+            );
+
+
+        checkpoint.name =
+            nombre;
+
+
+        checkpoint.transform.position =
+            posicion;
+
+
+        checkpoint.transform.localScale =
+            new Vector3(
+                1.5f,
+                0.04f,
+                1.5f
+            );
+
+
+        Renderer renderer =
+            checkpoint.GetComponent<Renderer>();
+
+
+        if (renderer != null)
+        {
+            Material material =
+                new Material(
+                    Shader.Find(
+                        "Universal Render Pipeline/Unlit"
+                    )
+                    ??
+                    Shader.Find("Standard")
+                );
+
+
+            material.color =
+                new Color(
+                    0.1f,
+                    1f,
+                    0.2f,
+                    1f
+                );
+
+
+            renderer.sharedMaterial =
+                material;
+        }
+
+
+        BoxCollider collider =
+            checkpoint.GetComponent<BoxCollider>();
+
+
+        if (collider != null)
+        {
+            collider.isTrigger =
+                true;
+        }
+
+
+        checkpoint.AddComponent<Checkpoint>();
     }
 }
