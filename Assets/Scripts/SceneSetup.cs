@@ -1,0 +1,652 @@
+using UnityEngine;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+/// <summary>
+/// Script de inicialización rápida y automatizada para la escena HD-2D.
+/// Crea automáticamente el suelo, el jugador, la cámara,
+/// las trampas de veneno y las trampas de fuego.
+/// </summary>
+public class SceneSetup : MonoBehaviour
+{
+    [Header("Configuración Automática")]
+
+    [Tooltip("Si está activo, generará los elementos de la escena automáticamente al pulsar Play si no existen.")]
+    [SerializeField] private bool autoSetupOnPlay = true;
+
+
+    private void Awake()
+    {
+        if (autoSetupOnPlay)
+        {
+            EjecutarConfiguracion();
+        }
+    }
+
+
+    /// <summary>
+    /// Inicialización automática al cargar la escena.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void AutoInicializarEnPlay()
+    {
+        if (FindAnyObjectByType<SceneSetup>() == null)
+        {
+            EjecutarConfiguracion();
+        }
+    }
+
+
+#if UNITY_EDITOR
+
+    /// <summary>
+    /// Permite ejecutar la configuración desde el menú de Unity Editor.
+    /// </summary>
+    [MenuItem("HD-2D/Configurar Escena Automáticamente")]
+    public static void MenuConfigurarEscena()
+    {
+        EjecutarConfiguracion();
+
+        Debug.Log(
+            "[SceneSetup] Escena HD-2D configurada con éxito desde el menú."
+        );
+    }
+
+#endif
+
+
+    /// <summary>
+    /// Crea el suelo, jugador, cámara,
+    /// trampas de veneno y trampas de fuego.
+    /// </summary>
+    public static void EjecutarConfiguracion()
+    {
+        CrearSuelo();
+
+        GameObject playerObj =
+            CrearJugador();
+
+        ConfigurarCamara(
+            playerObj
+        );
+
+        CrearTrampasVeneno();
+
+        CrearTrampasFuego();
+    }
+
+
+    // =====================================================================
+    // SUELO
+    // =====================================================================
+
+    private static void CrearSuelo()
+    {
+        GameObject ground =
+            GameObject.Find("Suelo_Ground");
+
+        if (ground == null)
+        {
+            ground =
+                GameObject.CreatePrimitive(
+                    PrimitiveType.Plane
+                );
+
+            ground.name =
+                "Suelo_Ground";
+
+            ground.transform.position =
+                Vector3.zero;
+
+            ground.transform.localScale =
+                new Vector3(3f, 1f, 3f);
+        }
+
+
+        Collider groundCol =
+            ground.GetComponent<Collider>();
+
+        if (groundCol == null)
+        {
+            groundCol =
+                ground.AddComponent<MeshCollider>();
+        }
+
+
+        StageBounds bounds =
+            ground.GetComponent<StageBounds>();
+
+        if (bounds == null)
+        {
+            bounds =
+                ground.AddComponent<StageBounds>();
+        }
+
+
+        bounds.GenerarLimitesFisicos();
+    }
+
+
+    // =====================================================================
+    // JUGADOR
+    // =====================================================================
+
+    private static GameObject CrearJugador()
+    {
+        GameObject player =
+            GameObject.Find("Player");
+
+
+        if (player == null)
+        {
+            player =
+                GameObject.CreatePrimitive(
+                    PrimitiveType.Cube
+                );
+
+            player.name =
+                "Player";
+
+            player.transform.position =
+                new Vector3(
+                    0f,
+                    1f,
+                    0f
+                );
+
+
+            Renderer cubeRenderer =
+                player.GetComponent<Renderer>();
+
+
+            if (cubeRenderer != null)
+            {
+                cubeRenderer.sharedMaterial =
+                    new Material(
+                        Shader.Find(
+                            "Universal Render Pipeline/Lit"
+                        )
+                        ??
+                        Shader.Find("Standard")
+                    )
+                    {
+                        color =
+                            new Color(
+                                0.2f,
+                                0.6f,
+                                1f
+                            )
+                    };
+            }
+        }
+
+
+        // Rigidbody
+
+        Rigidbody rb =
+            player.GetComponent<Rigidbody>();
+
+        if (rb == null)
+        {
+            rb =
+                player.AddComponent<Rigidbody>();
+        }
+
+
+        rb.constraints =
+            RigidbodyConstraints.FreezeRotationX |
+            RigidbodyConstraints.FreezeRotationY |
+            RigidbodyConstraints.FreezeRotationZ;
+
+        rb.interpolation =
+            RigidbodyInterpolation.Interpolate;
+
+        rb.collisionDetectionMode =
+            CollisionDetectionMode.Continuous;
+
+
+        // PlayerMovement
+
+        PlayerMovement movement =
+            player.GetComponent<PlayerMovement>();
+
+        if (movement == null)
+        {
+            movement =
+                player.AddComponent<PlayerMovement>();
+        }
+
+
+        // SpriteVisual
+
+        Transform visualChild =
+            player.transform.Find("SpriteVisual");
+
+
+        if (visualChild == null)
+        {
+            GameObject visualObj =
+                new GameObject(
+                    "SpriteVisual"
+                );
+
+            visualObj.transform.SetParent(
+                player.transform
+            );
+
+            visualObj.transform.localPosition =
+                Vector3.zero;
+
+            visualChild =
+                visualObj.transform;
+        }
+
+
+        SpriteRenderer spriteRenderer =
+            visualChild.GetComponent<SpriteRenderer>();
+
+
+        if (spriteRenderer == null)
+        {
+            spriteRenderer =
+                visualChild.gameObject
+                    .AddComponent<SpriteRenderer>();
+        }
+
+
+        // PlayerSpriteDirection
+
+        PlayerSpriteDirection spriteDir =
+            player.GetComponent<PlayerSpriteDirection>();
+
+
+        if (spriteDir == null)
+        {
+            spriteDir =
+                player.AddComponent<PlayerSpriteDirection>();
+        }
+
+
+        // PlayerHealth
+
+        PlayerHealth health =
+            player.GetComponent<PlayerHealth>();
+
+
+        if (health == null)
+        {
+            health =
+                player.AddComponent<PlayerHealth>();
+        }
+
+
+        // PlayerDash
+
+        PlayerDash dash =
+            player.GetComponent<PlayerDash>();
+
+
+        if (dash == null)
+        {
+            dash =
+                player.AddComponent<PlayerDash>();
+        }
+
+
+        return player;
+    }
+
+
+    // =====================================================================
+    // TRAMPAS DE VENENO
+    // =====================================================================
+
+    /// <summary>
+    /// Crea varias trampas de veneno repartidas por el escenario.
+    /// </summary>
+    private static void CrearTrampasVeneno()
+    {
+        // Evitar duplicarlas si EjecutarConfiguracion()
+        // se ejecuta más de una vez.
+
+        if (
+            GameObject.Find(
+                "PoisonTrap_0"
+            ) != null
+        )
+        {
+            return;
+        }
+
+
+        Vector3[] posiciones =
+        {
+            new Vector3(-6f, 0.02f,  4f),
+            new Vector3( 5f, 0.02f,  5f),
+            new Vector3(-7f, 0.02f, -5f),
+            new Vector3( 6f, 0.02f, -4f),
+            new Vector3( 0f, 0.02f,  7f),
+            new Vector3( 2f, 0.02f, -8f)
+        };
+
+
+        for (int i = 0; i < posiciones.Length; i++)
+        {
+            CrearTrampaVeneno(
+                $"PoisonTrap_{i}",
+                posiciones[i]
+            );
+        }
+    }
+
+
+    /// <summary>
+    /// Crea una única zona visual de veneno.
+    /// </summary>
+    private static void CrearTrampaVeneno(
+        string nombre,
+        Vector3 posicion
+    )
+    {
+        GameObject trap =
+            GameObject.CreatePrimitive(
+                PrimitiveType.Cylinder
+            );
+
+
+        trap.name =
+            nombre;
+
+        trap.transform.position =
+            posicion;
+
+        trap.transform.localScale =
+            new Vector3(
+                1.5f,
+                0.02f,
+                1.5f
+            );
+
+
+        // Material morado
+
+        Renderer renderer =
+            trap.GetComponent<Renderer>();
+
+
+        if (renderer != null)
+        {
+            Material material =
+                new Material(
+                    Shader.Find(
+                        "Universal Render Pipeline/Lit"
+                    )
+                    ??
+                    Shader.Find("Standard")
+                );
+
+
+            material.color =
+                new Color(
+                    0.55f,
+                    0.05f,
+                    0.75f,
+                    1f
+                );
+
+
+            renderer.sharedMaterial =
+                material;
+        }
+
+
+        // Collider
+
+        Collider collider =
+            trap.GetComponent<Collider>();
+
+
+        if (collider != null)
+        {
+            collider.isTrigger =
+                true;
+        }
+
+
+        // PoisonTrap
+
+        PoisonTrap poison =
+            trap.GetComponent<PoisonTrap>();
+
+
+        if (poison == null)
+        {
+            poison =
+                trap.AddComponent<PoisonTrap>();
+        }
+    }
+
+
+    // =====================================================================
+    // TRAMPAS DE FUEGO
+    // =====================================================================
+
+    /// <summary>
+    /// Crea varias trampas de fuego repartidas por el escenario.
+    /// </summary>
+    private static void CrearTrampasFuego()
+    {
+        // Evitar duplicarlas si ya existen.
+
+        if (
+            GameObject.Find(
+                "FireTrap_0"
+            ) != null
+        )
+        {
+            return;
+        }
+
+
+        Vector3[] posiciones =
+        {
+            new Vector3(-3f, 0.02f,  6f),
+            new Vector3( 7f, 0.02f,  2f),
+            new Vector3(-5f, 0.02f, -2f),
+            new Vector3( 4f, 0.02f, -7f),
+            new Vector3(-1f, 0.02f, -7f),
+            new Vector3( 7f, 0.02f, -6f)
+        };
+
+
+        for (int i = 0; i < posiciones.Length; i++)
+        {
+            CrearTrampaFuego(
+                $"FireTrap_{i}",
+                posiciones[i]
+            );
+        }
+    }
+
+
+    /// <summary>
+    /// Crea una única zona visual y física de fuego.
+    /// </summary>
+    private static void CrearTrampaFuego(
+        string nombre,
+        Vector3 posicion
+    )
+    {
+        GameObject trap =
+            GameObject.CreatePrimitive(
+                PrimitiveType.Cylinder
+            );
+
+
+        trap.name =
+            nombre;
+
+
+        trap.transform.position =
+            posicion;
+
+
+        // Tamaño ligeramente menor que el veneno.
+
+        float escala =
+            Random.Range(
+                0.8f,
+                1.1f
+            );
+
+
+        trap.transform.localScale =
+            new Vector3(
+                1.2f * escala,
+                0.02f,
+                1.2f * escala
+            );
+
+
+        // Rotación aleatoria
+
+        trap.transform.rotation =
+            Quaternion.Euler(
+                0f,
+                Random.Range(
+                    0f,
+                    360f
+                ),
+                0f
+            );
+
+
+        // Material rojo / naranja
+
+        Renderer renderer =
+            trap.GetComponent<Renderer>();
+
+
+        if (renderer != null)
+        {
+            Material material =
+                new Material(
+                    Shader.Find(
+                        "Universal Render Pipeline/Lit"
+                    )
+                    ??
+                    Shader.Find("Standard")
+                );
+
+
+            material.color =
+                new Color(
+                    1f,
+                    0.18f,
+                    0.02f,
+                    1f
+                );
+
+
+            renderer.sharedMaterial =
+                material;
+        }
+
+
+        // Collider
+
+        Collider collider =
+            trap.GetComponent<Collider>();
+
+
+        if (collider != null)
+        {
+            collider.isTrigger =
+                true;
+        }
+
+
+        // FireTrap
+
+        FireTrap fire =
+            trap.GetComponent<FireTrap>();
+
+
+        if (fire == null)
+        {
+            fire =
+                trap.AddComponent<FireTrap>();
+        }
+    }
+
+
+    // =====================================================================
+    // CÁMARA
+    // =====================================================================
+
+    private static void ConfigurarCamara(
+        GameObject player
+    )
+    {
+        Camera mainCam =
+            Camera.main;
+
+
+        if (mainCam == null)
+        {
+            GameObject camObj =
+                new GameObject(
+                    "Main Camera"
+                );
+
+
+            camObj.tag =
+                "MainCamera";
+
+
+            mainCam =
+                camObj.AddComponent<Camera>();
+
+
+            camObj.AddComponent<AudioListener>();
+        }
+
+
+        mainCam.transform.position =
+            new Vector3(
+                0f,
+                7f,
+                -10f
+            );
+
+
+        mainCam.transform.rotation =
+            Quaternion.Euler(
+                35f,
+                0f,
+                0f
+            );
+
+
+        CameraFollow cameraFollow =
+            mainCam.GetComponent<CameraFollow>();
+
+
+        if (cameraFollow == null)
+        {
+            cameraFollow =
+                mainCam.gameObject
+                    .AddComponent<CameraFollow>();
+        }
+
+
+        if (player != null)
+        {
+            cameraFollow.SetTarget(
+                player.transform
+            );
+        }
+    }
+}
