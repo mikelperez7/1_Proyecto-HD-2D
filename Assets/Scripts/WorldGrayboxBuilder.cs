@@ -1,174 +1,73 @@
 using UnityEngine;
-
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
+using UnityEngine.AI;
 using Unity.AI.Navigation;
 
 /// <summary>
-/// Constructor del mapa Graybox de pruebas para el proyecto HD-2D.
-///
-/// Crea una zona de pruebas 3D con:
-/// - Suelo
-/// - Paredes
-/// - Plataformas elevadas
-/// - Rampas
-/// - Escaleras
-/// - Obstáculos
-/// - Zonas de veneno
-/// - Zonas de fuego
-/// - Límites físicos del escenario
-/// - NavMesh para navegación de enemigos
-///
-/// Es una herramienta de prototipo.
+/// Genera el mundo Graybox de prueba.
+/// Crea geometría, trampas, límites y NavMesh.
 /// </summary>
 public class WorldGrayboxBuilder : MonoBehaviour
 {
-    [Header("Dimensiones del mapa")]
-    [SerializeField] private float mapWidth = 30f;
-    [SerializeField] private float mapLength = 30f;
-    [SerializeField] private float groundThickness = 0.5f;
+    [Header("Configuración general")]
+    [SerializeField] private bool generateOnStart = true;
 
-    [Header("Alturas")]
-    [SerializeField] private float platformHeight = 2f;
+    [Header("NavMesh")]
 
-    [Header("Navegación")]
-    [Tooltip("Construye automáticamente el NavMesh después de crear el Graybox.")]
-    [SerializeField] private bool construirNavMesh = true;
+    private Transform world;
 
-    [Header("Organización")]
-    [SerializeField] private bool limpiarMapaAnterior = true;
-
-#if UNITY_EDITOR
-
-    [MenuItem("HD-2D/Construir mapa Graybox de pruebas")]
-    private static void MenuConstruirMapa()
+    private void Start()
     {
-        WorldGrayboxBuilder builder =
-            FindAnyObjectByType<WorldGrayboxBuilder>();
-
-        if (builder == null)
+        if (generateOnStart)
         {
-            GameObject builderObject =
-                new GameObject("WorldGrayboxBuilder");
-
-            builder =
-                builderObject.AddComponent<WorldGrayboxBuilder>();
+            GenerarGraybox();
         }
-
-        builder.ConstruirMapa();
-
-        Debug.Log(
-            "[WorldGrayboxBuilder] Mapa Graybox construido correctamente."
-        );
     }
 
-#endif
-
-    public void ConstruirMapa()
+    [ContextMenu("Generar Graybox")]
+    public void GenerarGraybox()
     {
-        if (limpiarMapaAnterior)
-        {
-            EliminarMapaAnterior();
-        }
+        LimpiarGraybox();
 
-        Transform world =
-            CrearContenedor("World");
-
-        Transform groundContainer =
+        world =
             CrearContenedor(
-                world,
-                "Ground"
+                "World"
             );
 
-        Transform wallsContainer =
-            CrearContenedor(
-                world,
-                "Walls"
-            );
+        CrearSuelo(world);
 
-        Transform platformsContainer =
-            CrearContenedor(
-                world,
-                "Platforms"
-            );
+        CrearParedes(world);
 
-        Transform rampsContainer =
-            CrearContenedor(
-                world,
-                "Ramps"
-            );
+        CrearPlataformas(world);
 
-        Transform stairsContainer =
-            CrearContenedor(
-                world,
-                "Stairs"
-            );
+        CrearEscaleras(world);
 
-        Transform obstaclesContainer =
-            CrearContenedor(
-                world,
-                "Obstacles"
-            );
+        CrearObstaculos(world);
 
-        Transform poisonContainer =
-            CrearContenedor(
-                world,
-                "PoisonZones"
-            );
+        CrearZonasVeneno(world);
 
-        Transform fireContainer =
-            CrearContenedor(
-                world,
-                "FireZones"
-            );
-
-        CrearSuelo(
-            groundContainer
-        );
-
-        CrearParedes(
-            wallsContainer
-        );
-
-        CrearPlataformas(
-            platformsContainer
-        );
-
-        CrearRampas(
-            rampsContainer
-        );
-
-        CrearEscaleras(
-            stairsContainer
-        );
-
-        CrearObstaculos(
-            obstaclesContainer
-        );
-
-        CrearZonasVeneno(
-            poisonContainer
-        );
-
-        CrearZonasFuego(
-            fireContainer
-        );
+        CrearZonasFuego(world);
 
         ConfigurarStageBounds();
 
-        if (construirNavMesh)
-        {
-            ConfigurarNavMesh(
-                world
-            );
-        }
+        ConfigurarNavMesh(world);
 
         Debug.Log(
             "[WorldGrayboxBuilder] " +
-            "Zona de pruebas creada correctamente."
+            "Graybox generado correctamente."
         );
+    }
+
+    private void LimpiarGraybox()
+    {
+        GameObject previousWorld =
+            GameObject.Find("World");
+
+        if (previousWorld != null)
+        {
+            DestroyImmediate(
+                previousWorld
+            );
+        }
     }
 
     // =====================================================================
@@ -179,43 +78,16 @@ public class WorldGrayboxBuilder : MonoBehaviour
         Transform container
     )
     {
-        GameObject ground =
-            CrearCubo(
-                "Ground_Main",
-                container,
-                new Vector3(
-                    0f,
-                    -groundThickness * 0.5f,
-                    0f
-                ),
-                new Vector3(
-                    mapWidth,
-                    groundThickness,
-                    mapLength
-                )
-            );
-
-        MeshCollider meshCollider =
-            ground.GetComponent<MeshCollider>();
-
-        if (meshCollider == null)
-        {
-            BoxCollider boxCollider =
-                ground.GetComponent<BoxCollider>();
-
-            if (boxCollider != null)
-            {
-                DestroyImmediateSafe(
-                    boxCollider
-                );
-            }
-
-            meshCollider =
-                ground.AddComponent<MeshCollider>();
-        }
-
-        meshCollider.convex =
-            false;
+        CrearCubo(
+            "Ground",
+            container,
+            Vector3.zero,
+            new Vector3(
+                30f,
+                1f,
+                30f
+            )
+        );
     }
 
     // =====================================================================
@@ -226,21 +98,18 @@ public class WorldGrayboxBuilder : MonoBehaviour
         Transform container
     )
     {
-        float wallHeight = 3f;
-        float wallThickness = 0.5f;
-
         CrearCubo(
             "Wall_North",
             container,
             new Vector3(
                 0f,
-                wallHeight * 0.5f,
-                mapLength * 0.5f
+                1f,
+                14.5f
             ),
             new Vector3(
-                mapWidth,
-                wallHeight,
-                wallThickness
+                30f,
+                2f,
+                1f
             )
         );
 
@@ -249,13 +118,13 @@ public class WorldGrayboxBuilder : MonoBehaviour
             container,
             new Vector3(
                 0f,
-                wallHeight * 0.5f,
-                -mapLength * 0.5f
+                1f,
+                -14.5f
             ),
             new Vector3(
-                mapWidth,
-                wallHeight,
-                wallThickness
+                30f,
+                2f,
+                1f
             )
         );
 
@@ -263,14 +132,14 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Wall_East",
             container,
             new Vector3(
-                mapWidth * 0.5f,
-                wallHeight * 0.5f,
+                14.5f,
+                1f,
                 0f
             ),
             new Vector3(
-                wallThickness,
-                wallHeight,
-                mapLength
+                1f,
+                2f,
+                30f
             )
         );
 
@@ -278,76 +147,14 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Wall_West",
             container,
             new Vector3(
-                -mapWidth * 0.5f,
-                wallHeight * 0.5f,
+                -14.5f,
+                1f,
                 0f
             ),
             new Vector3(
-                wallThickness,
-                wallHeight,
-                mapLength
-            )
-        );
-
-        // Paredes interiores para probar navegación alrededor de obstáculos.
-
-        CrearCubo(
-            "Wall_Interior_01",
-            container,
-            new Vector3(
-                -5f,
                 1f,
-                3f
-            ),
-            new Vector3(
-                8f,
                 2f,
-                0.5f
-            )
-        );
-
-        CrearCubo(
-            "Wall_Interior_02",
-            container,
-            new Vector3(
-                5f,
-                1f,
-                -3f
-            ),
-            new Vector3(
-                0.5f,
-                2f,
-                8f
-            )
-        );
-
-        CrearCubo(
-            "Wall_Interior_03",
-            container,
-            new Vector3(
-                0f,
-                1f,
-                -1f
-            ),
-            new Vector3(
-                6f,
-                2f,
-                0.5f
-            )
-        );
-
-        CrearCubo(
-            "Wall_Interior_04",
-            container,
-            new Vector3(
-                -2f,
-                1f,
-                -6f
-            ),
-            new Vector3(
-                0.5f,
-                2f,
-                6f
+                30f
             )
         );
     }
@@ -364,13 +171,13 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Platform_01",
             container,
             new Vector3(
-                -7f,
-                platformHeight * 0.5f,
-                8f
+                -6f,
+                1.5f,
+                3f
             ),
             new Vector3(
-                7f,
-                platformHeight,
+                5f,
+                3f,
                 5f
             )
         );
@@ -379,96 +186,16 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Platform_02",
             container,
             new Vector3(
-                8f,
-                platformHeight * 0.5f,
-                7f
-            ),
-            new Vector3(
-                5f,
-                platformHeight,
-                5f
-            )
-        );
-
-        CrearCubo(
-            "Platform_03",
-            container,
-            new Vector3(
                 7f,
-                1f,
-                -8f
-            ),
-            new Vector3(
-                6f,
                 2f,
-                4f
-            )
-        );
-    }
-
-    // =====================================================================
-    // RAMPAS
-    // =====================================================================
-
-    private void CrearRampas(
-        Transform container
-    )
-    {
-        CrearRampa(
-            "Ramp_01",
-            container,
-            new Vector3(
-                -7f,
-                1f,
-                4f
-            ),
-            new Vector3(
-                5f,
-                2f,
-                3f
-            ),
-            -20f
-        );
-
-        CrearRampa(
-            "Ramp_02",
-            container,
-            new Vector3(
-                3f,
-                1f,
-                8f
+                5f
             ),
             new Vector3(
                 4f,
-                2f,
-                3f
-            ),
-            20f
+                4f,
+                4f
+            )
         );
-    }
-
-    private void CrearRampa(
-        string nombre,
-        Transform container,
-        Vector3 posicion,
-        Vector3 escala,
-        float rotacionX
-    )
-    {
-        GameObject ramp =
-            CrearCubo(
-                nombre,
-                container,
-                posicion,
-                escala
-            );
-
-        ramp.transform.rotation =
-            Quaternion.Euler(
-                rotacionX,
-                0f,
-                0f
-            );
     }
 
     // =====================================================================
@@ -479,86 +206,30 @@ public class WorldGrayboxBuilder : MonoBehaviour
         Transform container
     )
     {
-        CrearEscalera(
-            "Stairs_01",
-            container,
-            new Vector3(
-                -1f,
-                0f,
-                7f
-            ),
-            false
-        );
-
-        CrearEscalera(
-            "Stairs_02",
-            container,
-            new Vector3(
-                -7f,
-                0f,
-                -7f
-            ),
-            true
-        );
-    }
-
-    private void CrearEscalera(
-        string nombre,
-        Transform container,
-        Vector3 posicion,
-        bool rotar
-    )
-    {
-        GameObject stairs =
-            new GameObject(
-                nombre
+        Transform stairs =
+            CrearContenedor(
+                container,
+                "Stairs"
             );
 
-        stairs.transform.SetParent(
-            container
-        );
-
-        stairs.transform.position =
-            posicion;
-
-        if (rotar)
+        for (
+            int i = 0;
+            i < 5;
+            i++
+        )
         {
-            stairs.transform.rotation =
-                Quaternion.Euler(
-                    0f,
-                    90f,
-                    0f
-                );
-        }
-
-        const int stepCount = 6;
-
-        float stepWidth = 3f;
-        float stepDepth = 0.6f;
-        float stepHeight = 0.35f;
-
-        for (int i = 0; i < stepCount; i++)
-        {
-            float height =
-                stepHeight *
-                (i + 1);
-
-            float depth =
-                stepDepth *
-                i;
-
             CrearCubo(
-                $"Step_{i + 1}",
-                stairs.transform,
+                "Step_" + i,
+                stairs,
                 new Vector3(
-                    0f,
-                    height * 0.5f,
-                    depth
+                    -6f + i * 0.8f,
+                    0.2f + i * 0.2f,
+                    0f
                 ),
                 new Vector3(
-                    stepWidth,
-                    height,
-                    stepDepth
+                    0.8f,
+                    0.4f + i * 0.4f,
+                    2f
                 )
             );
         }
@@ -576,9 +247,9 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Obstacle_Block_01",
             container,
             new Vector3(
-                2f,
+                -2f,
                 1f,
-                2f
+                6f
             ),
             new Vector3(
                 2f,
@@ -591,9 +262,9 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Obstacle_Block_02",
             container,
             new Vector3(
-                -8f,
+                3f,
                 0.75f,
-                -1f
+                1f
             ),
             new Vector3(
                 3f,
@@ -606,13 +277,13 @@ public class WorldGrayboxBuilder : MonoBehaviour
             "Obstacle_Block_03",
             container,
             new Vector3(
-                9f,
-                0.5f,
-                -1f
+                8f,
+                1f,
+                -2f
             ),
             new Vector3(
-                1.5f,
-                1f,
+                2f,
+                2f,
                 3f
             )
         );
@@ -817,45 +488,46 @@ public class WorldGrayboxBuilder : MonoBehaviour
     // =====================================================================
 
     private void ConfigurarNavMesh(
-    Transform world
-)
-{
-    NavMeshSurface surface =
-        world.GetComponent<NavMeshSurface>();
-
-    if (surface == null)
+        Transform world
+    )
     {
-        surface =
-            world.gameObject.AddComponent<NavMeshSurface>();
+        NavMeshSurface surface =
+            world.GetComponent<NavMeshSurface>();
+
+        if (surface == null)
+        {
+            surface =
+                world.gameObject.AddComponent<NavMeshSurface>();
+        }
+
+        /*
+         * El NavMesh recoge los colliders de los hijos de World.
+         */
+        surface.collectObjects =
+            CollectObjects.Children;
+
+        /*
+         * Utilizamos todos los layers porque el Graybox todavía
+         * no tiene una separación definitiva de layers.
+         */
+        surface.layerMask =
+            ~0;
+
+        /*
+         * Mantenemos exactamente el Agent Type que ya estaba
+         * configurado en el NavMeshSurface.
+         *
+         * No creamos Agent Types runtime.
+         */
+        surface.BuildNavMesh();
+
+        Debug.Log(
+            "[WorldGrayboxBuilder] " +
+            "NavMesh construido correctamente. " +
+            "AgentTypeID: " +
+            surface.agentTypeID
+        );
     }
-
-    /*
-     * El NavMesh recoge los colliders de los hijos de World.
-     *
-     * Esto permite que el suelo, plataformas y demás geometría
-     * participen en la construcción.
-     */
-    surface.collectObjects =
-        CollectObjects.Children;
-
-    /*
-     * Utilizamos todos los layers porque el Graybox todavía
-     * no tiene una separación definitiva de layers.
-     */
-    surface.layerMask =
-        ~0;
-
-    /*
-     * Construimos el NavMesh después de haber creado TODO
-     * el escenario.
-     */
-    surface.BuildNavMesh();
-
-    Debug.Log(
-        "[WorldGrayboxBuilder] " +
-        "NavMesh construido correctamente."
-    );
-}
 
     // =====================================================================
     // CREACIÓN DE CUBOS
@@ -985,49 +657,5 @@ public class WorldGrayboxBuilder : MonoBehaviour
             Vector3.one;
 
         return obj.transform;
-    }
-
-    // =====================================================================
-    // LIMPIEZA
-    // =====================================================================
-
-    private void EliminarMapaAnterior()
-    {
-        GameObject world =
-            GameObject.Find(
-                "World"
-            );
-
-        if (world != null)
-        {
-            DestroyImmediateSafe(
-                world
-            );
-        }
-    }
-
-    private void DestroyImmediateSafe(
-        Object obj
-    )
-    {
-        if (obj == null)
-            return;
-
-#if UNITY_EDITOR
-        if (!Application.isPlaying)
-        {
-            DestroyImmediate(
-                obj
-            );
-        }
-        else
-        {
-            Destroy(
-                obj
-            );
-        }
-#else
-        Destroy(obj);
-#endif
     }
 }

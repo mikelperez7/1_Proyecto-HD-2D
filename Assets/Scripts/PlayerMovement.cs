@@ -5,63 +5,45 @@ using UnityEngine.InputSystem;
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Configuración de Movimiento")]
-
     [SerializeField] private float moveSpeed = 6f;
-
     [SerializeField] private float acceleration = 50f;
-
     [SerializeField] private float deceleration = 60f;
 
     [Header("Configuración HD-2D / Cámara")]
-
     [SerializeField] private bool alignWithCamera = true;
-
     [SerializeField] private Camera mainCamera;
 
     [Header("Configuración de Sprite")]
-
     [SerializeField] private bool flipSpriteOnDirection = true;
-
     [SerializeField] private SpriteRenderer spriteRenderer;
 
     private Rigidbody rb;
-
     private Vector2 inputVector;
-
     private Vector3 targetVelocity;
-
-    private Vector3 lastNonZeroDirection =
-        Vector3.forward;
+    private Vector3 lastNonZeroDirection = Vector3.forward;
 
     private Vector3 wallNormal;
-
-    private bool touchingWall;
-
     private Collider currentWallCollider;
 
     public float MoveSpeed => moveSpeed;
 
-    public Vector3 Direction =>
-        lastNonZeroDirection;
+    public Vector3 Direction => lastNonZeroDirection;
 
     public bool IsMoving =>
         inputVector.sqrMagnitude > 0.01f;
 
     private void Awake()
     {
-        rb =
-            GetComponent<Rigidbody>();
+        rb = GetComponent<Rigidbody>();
 
         if (spriteRenderer == null)
         {
-            spriteRenderer =
-                GetComponentInChildren<SpriteRenderer>();
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         }
 
         if (mainCamera == null)
         {
-            mainCamera =
-                Camera.main;
+            mainCamera = Camera.main;
         }
 
         ConfigurarRigidbody();
@@ -71,15 +53,13 @@ public class PlayerMovement : MonoBehaviour
     {
         if (mainCamera == null)
         {
-            mainCamera =
-                Camera.main;
+            mainCamera = Camera.main;
         }
     }
 
     private void Update()
     {
         ProcesarEntradaNewInputSystem();
-
         ActualizarOrientacionSprite();
     }
 
@@ -110,8 +90,7 @@ public class PlayerMovement : MonoBehaviour
         float moveX = 0f;
         float moveZ = 0f;
 
-        Keyboard keyboard =
-            Keyboard.current;
+        Keyboard keyboard = Keyboard.current;
 
         if (keyboard != null)
         {
@@ -140,8 +119,7 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        Gamepad gamepad =
-            Gamepad.current;
+        Gamepad gamepad = Gamepad.current;
 
         if (gamepad != null)
         {
@@ -184,30 +162,19 @@ public class PlayerMovement : MonoBehaviour
             moveDirection *
             moveSpeed;
 
+        /*
+         * No proyectamos la velocidad sobre la normal
+         * de una pared.
+         *
+         * El Rigidbody y PhysX se encargan de resolver
+         * la colisión físicamente.
+         *
+         * Esto permite que el jugador pueda separarse
+         * inmediatamente de una pared al introducir
+         * dirección contraria.
+         */
         targetVelocity.y =
             rb.linearVelocity.y;
-
-        if (touchingWall)
-        {
-            Vector3 horizontalVelocity =
-                new Vector3(
-                    targetVelocity.x,
-                    0f,
-                    targetVelocity.z
-                );
-
-            horizontalVelocity =
-                Vector3.ProjectOnPlane(
-                    horizontalVelocity,
-                    wallNormal
-                );
-
-            targetVelocity.x =
-                horizontalVelocity.x;
-
-            targetVelocity.z =
-                horizontalVelocity.z;
-        }
 
         float rate =
             (inputVector.sqrMagnitude > 0.01f)
@@ -302,8 +269,6 @@ public class PlayerMovement : MonoBehaviour
         if (collision.collider ==
             currentWallCollider)
         {
-            touchingWall = false;
-
             wallNormal =
                 Vector3.zero;
 
@@ -325,8 +290,6 @@ public class PlayerMovement : MonoBehaviour
             {
                 wallNormal =
                     normal.normalized;
-
-                touchingWall = true;
 
                 currentWallCollider =
                     collision.collider;
