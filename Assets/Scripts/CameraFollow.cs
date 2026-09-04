@@ -24,17 +24,12 @@ public class CameraFollow : MonoBehaviour
     [Header("Límites de Cámara")]
     [SerializeField] private StageBounds stageBounds;
 
-    [SerializeField] private float cameraSafetyMargin = 3f;
-
-    [SerializeField] private bool enableCameraBounds = true;
-
 
     // =====================================================================
     // SHAKE
     // =====================================================================
 
     [Header("Shake de daño")]
-
     [Tooltip("Duración del latigazo.")]
     [SerializeField] private float shakeDuration = 0.20f;
 
@@ -201,49 +196,23 @@ public class CameraFollow : MonoBehaviour
 
     private void SeguirObjetivoSuavemente()
     {
+        /*
+         * IMPORTANTE:
+         *
+         * La cámara sigue directamente al jugador.
+         *
+         * No se aplican límites mediante StageBounds.
+         *
+         * Los límites físicos del mundo pertenecen al escenario,
+         * no a la cámara.
+         *
+         * Esto evita que la cámara parezca tener una pared invisible
+         * o un límite inferior/superior al llegar a los extremos del mapa.
+         */
+
         Vector3 targetPosition =
             target.position +
             offset;
-
-
-        if (
-            enableCameraBounds &&
-            stageBounds != null
-        )
-        {
-            Bounds playBounds =
-                stageBounds.GetPlayAreaBounds();
-
-
-            playBounds.Expand(
-                -cameraSafetyMargin *
-                2f
-            );
-
-
-            targetPosition.x =
-                Mathf.Clamp(
-                    targetPosition.x,
-                    playBounds.min.x,
-                    playBounds.max.x
-                );
-
-
-            targetPosition.y =
-                Mathf.Clamp(
-                    targetPosition.y,
-                    playBounds.min.y,
-                    playBounds.max.y
-                );
-
-
-            targetPosition.z =
-                Mathf.Clamp(
-                    targetPosition.z,
-                    playBounds.min.z,
-                    playBounds.max.z
-                );
-        }
 
 
         transform.position =
@@ -324,7 +293,6 @@ public class CameraFollow : MonoBehaviour
 
         float strength;
 
-
         if (
             currentShakeType ==
             DamageType.Fire
@@ -345,7 +313,6 @@ public class CameraFollow : MonoBehaviour
         // ================================================================
 
         Vector3 direction;
-
 
         if (
             currentShakeType ==
@@ -399,7 +366,6 @@ public class CameraFollow : MonoBehaviour
 
             // MUY IMPORTANTE:
             // vuelve inmediatamente a la posición natural.
-
             transform.position =
                 naturalPosition;
         }
@@ -412,11 +378,13 @@ public class CameraFollow : MonoBehaviour
     {
         AplicarRotacionInicial();
 
+
         shakeDuration =
             Mathf.Max(
                 0.01f,
                 shakeDuration
             );
+
 
         poisonShakeStrength =
             Mathf.Max(
@@ -424,11 +392,13 @@ public class CameraFollow : MonoBehaviour
                 poisonShakeStrength
             );
 
+
         fireShakeStrength =
             Mathf.Max(
                 0f,
                 fireShakeStrength
             );
+
 
         shakeCycles =
             Mathf.Max(

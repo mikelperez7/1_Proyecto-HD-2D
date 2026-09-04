@@ -1,153 +1,116 @@
 using UnityEngine;
 
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
 /// <summary>
-/// Script de inicialización rápida y automatizada para la escena HD-2D.
-/// Crea automáticamente el suelo, el jugador, la cámara,
-/// las trampas de veneno, las trampas de fuego,
-/// los checkpoints y el enemigo de prueba.
+/// Inicialización de los sistemas jugables de la escena.
+///
+/// IMPORTANTE:
+/// - NO crea el mapa.
+/// - NO crea el suelo.
+/// - NO crea las paredes.
+/// - NO crea las trampas del mapa.
+///
+/// El mapa es responsabilidad de WorldGrayboxBuilder.
+///
+/// Este script garantiza que existan:
+/// - Player
+/// - Cámara
+/// - Enemy_Test
+/// - HealthUI
+/// - DashUI
+/// - DamageFeedbackUI
 /// </summary>
 public class SceneSetup : MonoBehaviour
 {
     [Header("Configuración Automática")]
-
-    [Tooltip("Si está activo, generará los elementos de la escena automáticamente al pulsar Play si no existen.")]
+    [Tooltip("Inicializa automáticamente los sistemas al entrar en Play.")]
     [SerializeField] private bool autoSetupOnPlay = true;
 
+    [Header("Player")]
+    [SerializeField] private Vector3 playerSpawnPosition =
+        new Vector3(0f, 1f, 0f);
+
+    [Header("Enemigo")]
+    [SerializeField] private Vector3 enemySpawnPosition =
+        new Vector3(8f, 1f, 8f);
+
+    private static bool configuracionEjecutada;
 
     private void Awake()
     {
-        if (autoSetupOnPlay)
-        {
-            EjecutarConfiguracion();
-        }
+        if (!autoSetupOnPlay)
+            return;
+
+        EjecutarConfiguracion();
     }
 
-
     /// <summary>
-    /// Inicialización automática al cargar la escena.
+    /// Garantiza la inicialización incluso si no existe
+    /// un objeto SceneSetup en la escena.
     /// </summary>
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    [RuntimeInitializeOnLoadMethod(
+        RuntimeInitializeLoadType.AfterSceneLoad
+    )]
     private static void AutoInicializarEnPlay()
     {
-        if (FindAnyObjectByType<SceneSetup>() == null)
+        if (configuracionEjecutada)
+            return;
+
+        SceneSetup setup =
+            FindAnyObjectByType<SceneSetup>();
+
+        if (setup != null)
         {
-            EjecutarConfiguracion();
+            if (setup.autoSetupOnPlay)
+            {
+                setup.EjecutarConfiguracion();
+            }
+
+            return;
         }
+
+        GameObject setupObject =
+            new GameObject("SceneSetup_Runtime");
+
+        setup =
+            setupObject.AddComponent<SceneSetup>();
+
+        setup.autoSetupOnPlay = true;
+
+        setup.EjecutarConfiguracion();
     }
 
-
-#if UNITY_EDITOR
-
-    /// <summary>
-    /// Permite ejecutar la configuración desde el menú de Unity Editor.
-    /// </summary>
-    [MenuItem("HD-2D/Configurar Escena Automáticamente")]
-    public static void MenuConfigurarEscena()
+    [ContextMenu("Configurar Escena")]
+    public void EjecutarConfiguracion()
     {
-        EjecutarConfiguracion();
+        if (configuracionEjecutada)
+            return;
 
-        Debug.Log(
-            "[SceneSetup] Escena HD-2D configurada con éxito desde el menú."
-        );
-    }
+        configuracionEjecutada = true;
 
-#endif
-
-
-    /// <summary>
-    /// Crea el suelo, jugador, cámara,
-    /// trampas de veneno, trampas de fuego,
-    /// checkpoints y enemigo.
-    /// </summary>
-    public static void EjecutarConfiguracion()
-    {
-        CrearSuelo();
-
-        GameObject playerObj =
+        GameObject player =
             CrearJugador();
 
         ConfigurarCamara(
-            playerObj
+            player
         );
 
-        CrearTrampasVeneno();
-
-        CrearTrampasFuego();
-
-        CrearCheckpoints();
-
         CrearEnemigo();
+
+        CrearHUD();
+
+        Debug.Log(
+            "[SceneSetup] Sistemas jugables inicializados correctamente."
+        );
     }
-
-
-    // =====================================================================
-    // SUELO
-    // =====================================================================
-
-    private static void CrearSuelo()
-    {
-        GameObject ground =
-            GameObject.Find("Suelo_Ground");
-
-        if (ground == null)
-        {
-            ground =
-                GameObject.CreatePrimitive(
-                    PrimitiveType.Plane
-                );
-
-            ground.name =
-                "Suelo_Ground";
-
-            ground.transform.position =
-                Vector3.zero;
-
-            ground.transform.localScale =
-                new Vector3(
-                    3f,
-                    1f,
-                    3f
-                );
-        }
-
-
-        Collider groundCol =
-            ground.GetComponent<Collider>();
-
-        if (groundCol == null)
-        {
-            groundCol =
-                ground.AddComponent<MeshCollider>();
-        }
-
-
-        StageBounds bounds =
-            ground.GetComponent<StageBounds>();
-
-        if (bounds == null)
-        {
-            bounds =
-                ground.AddComponent<StageBounds>();
-        }
-
-
-        bounds.GenerarLimitesFisicos();
-    }
-
 
     // =====================================================================
     // JUGADOR
     // =====================================================================
 
-    private static GameObject CrearJugador()
+    private GameObject CrearJugador()
     {
         GameObject player =
             GameObject.Find("Player");
-
 
         if (player == null)
         {
@@ -160,40 +123,54 @@ public class SceneSetup : MonoBehaviour
                 "Player";
 
             player.transform.position =
+                playerSpawnPosition;
+
+            player.transform.localScale =
                 new Vector3(
-                    0f,
                     1f,
-                    0f
+                    1f,
+                    1f
                 );
 
-
-            Renderer cubeRenderer =
+            Renderer renderer =
                 player.GetComponent<Renderer>();
 
-
-            if (cubeRenderer != null)
+            if (renderer != null)
             {
-                cubeRenderer.sharedMaterial =
-                    new Material(
+                Shader shader =
+                    Shader.Find(
+                        "Universal Render Pipeline/Lit"
+                    );
+
+                if (shader == null)
+                {
+                    shader =
                         Shader.Find(
-                            "Universal Render Pipeline/Lit"
-                        )
-                        ??
-                        Shader.Find("Standard")
-                    )
-                    {
-                        color =
-                            new Color(
-                                0.2f,
-                                0.6f,
-                                1f
-                            )
-                    };
+                            "Standard"
+                        );
+                }
+
+                if (shader != null)
+                {
+                    Material material =
+                        new Material(shader);
+
+                    material.color =
+                        new Color(
+                            0.2f,
+                            0.6f,
+                            1f
+                        );
+
+                    renderer.sharedMaterial =
+                        material;
+                }
             }
         }
 
-
-        // Rigidbody
+        // ================================================================
+        // RIGIDBODY
+        // ================================================================
 
         Rigidbody rb =
             player.GetComponent<Rigidbody>();
@@ -203,7 +180,6 @@ public class SceneSetup : MonoBehaviour
             rb =
                 player.AddComponent<Rigidbody>();
         }
-
 
         rb.constraints =
             RigidbodyConstraints.FreezeRotationX |
@@ -216,8 +192,9 @@ public class SceneSetup : MonoBehaviour
         rb.collisionDetectionMode =
             CollisionDetectionMode.Continuous;
 
-
-        // PlayerMovement
+        // ================================================================
+        // MOVIMIENTO
+        // ================================================================
 
         PlayerMovement movement =
             player.GetComponent<PlayerMovement>();
@@ -228,62 +205,64 @@ public class SceneSetup : MonoBehaviour
                 player.AddComponent<PlayerMovement>();
         }
 
-
-        // SpriteVisual
+        // ================================================================
+        // SPRITE VISUAL
+        // ================================================================
 
         Transform visualChild =
-            player.transform.Find("SpriteVisual");
-
+            player.transform.Find(
+                "SpriteVisual"
+            );
 
         if (visualChild == null)
         {
-            GameObject visualObj =
+            GameObject visualObject =
                 new GameObject(
                     "SpriteVisual"
                 );
 
-            visualObj.transform.SetParent(
+            visualObject.transform.SetParent(
                 player.transform
             );
 
-            visualObj.transform.localPosition =
+            visualObject.transform.localPosition =
                 Vector3.zero;
 
-            visualChild =
-                visualObj.transform;
-        }
+            visualObject.transform.localRotation =
+                Quaternion.identity;
 
+            visualChild =
+                visualObject.transform;
+        }
 
         SpriteRenderer spriteRenderer =
             visualChild.GetComponent<SpriteRenderer>();
 
-
         if (spriteRenderer == null)
         {
             spriteRenderer =
-                visualChild.gameObject
-                    .AddComponent<SpriteRenderer>();
+                visualChild.gameObject.AddComponent<SpriteRenderer>();
         }
 
+        // ================================================================
+        // ORIENTACIÓN DEL SPRITE
+        // ================================================================
 
-        // PlayerSpriteDirection
-
-        PlayerSpriteDirection spriteDir =
+        PlayerSpriteDirection spriteDirection =
             player.GetComponent<PlayerSpriteDirection>();
 
-
-        if (spriteDir == null)
+        if (spriteDirection == null)
         {
-            spriteDir =
+            spriteDirection =
                 player.AddComponent<PlayerSpriteDirection>();
         }
 
-
-        // PlayerHealth
+        // ================================================================
+        // VIDA
+        // ================================================================
 
         PlayerHealth health =
             player.GetComponent<PlayerHealth>();
-
 
         if (health == null)
         {
@@ -291,12 +270,12 @@ public class SceneSetup : MonoBehaviour
                 player.AddComponent<PlayerHealth>();
         }
 
-
-        // PlayerDash
+        // ================================================================
+        // DASH
+        // ================================================================
 
         PlayerDash dash =
             player.GetComponent<PlayerDash>();
-
 
         if (dash == null)
         {
@@ -304,31 +283,48 @@ public class SceneSetup : MonoBehaviour
                 player.AddComponent<PlayerDash>();
         }
 
-
         return player;
     }
-
 
     // =====================================================================
     // ENEMIGO
     // =====================================================================
 
-    /// <summary>
-    /// Crea el enemigo de prueba.
-    /// </summary>
-    private static void CrearEnemigo()
+    private void CrearEnemigo()
     {
-        if (
-            GameObject.Find(
-                "Enemy_Test"
-            ) != null
-        )
+        GameObject enemy =
+            GameObject.Find("Enemy_Test");
+
+        if (enemy != null)
         {
+            EnemyNavigation navigationExisting =
+                enemy.GetComponent<EnemyNavigation>();
+
+            if (navigationExisting == null)
+            {
+                enemy.AddComponent<EnemyNavigation>();
+            }
+
+            EnemyChase chaseExisting =
+                enemy.GetComponent<EnemyChase>();
+
+            if (chaseExisting == null)
+            {
+                enemy.AddComponent<EnemyChase>();
+            }
+
+            EnemyHealth healthExisting =
+                enemy.GetComponent<EnemyHealth>();
+
+            if (healthExisting == null)
+            {
+                enemy.AddComponent<EnemyHealth>();
+            }
+
             return;
         }
 
-
-        GameObject enemy =
+        enemy =
             GameObject.CreatePrimitive(
                 PrimitiveType.Cube
             );
@@ -336,14 +332,8 @@ public class SceneSetup : MonoBehaviour
         enemy.name =
             "Enemy_Test";
 
-
         enemy.transform.position =
-            new Vector3(
-                8f,
-                1f,
-                8f
-            );
-
+            enemySpawnPosition;
 
         enemy.transform.localScale =
             new Vector3(
@@ -351,7 +341,6 @@ public class SceneSetup : MonoBehaviour
                 1f,
                 1f
             );
-
 
         // ================================================================
         // MATERIAL
@@ -362,26 +351,35 @@ public class SceneSetup : MonoBehaviour
 
         if (renderer != null)
         {
-            Material material =
-                new Material(
+            Shader shader =
+                Shader.Find(
+                    "Universal Render Pipeline/Lit"
+                );
+
+            if (shader == null)
+            {
+                shader =
                     Shader.Find(
-                        "Universal Render Pipeline/Lit"
-                    )
-                    ??
-                    Shader.Find("Standard")
-                );
+                        "Standard"
+                    );
+            }
 
-            material.color =
-                new Color(
-                    0.9f,
-                    0.1f,
-                    0.1f
-                );
+            if (shader != null)
+            {
+                Material material =
+                    new Material(shader);
 
-            renderer.sharedMaterial =
-                material;
+                material.color =
+                    new Color(
+                        0.9f,
+                        0.1f,
+                        0.1f
+                    );
+
+                renderer.sharedMaterial =
+                    material;
+            }
         }
-
 
         // ================================================================
         // RIGIDBODY
@@ -396,7 +394,6 @@ public class SceneSetup : MonoBehaviour
                 enemy.AddComponent<Rigidbody>();
         }
 
-
         rb.constraints =
             RigidbodyConstraints.FreezeRotationX |
             RigidbodyConstraints.FreezeRotationY |
@@ -408,349 +405,78 @@ public class SceneSetup : MonoBehaviour
         rb.collisionDetectionMode =
             CollisionDetectionMode.Continuous;
 
-
         // ================================================================
         // VIDA
         // ================================================================
 
-        EnemyHealth health =
-            enemy.GetComponent<EnemyHealth>();
+        enemy.AddComponent<EnemyHealth>();
 
-        if (health == null)
-        {
-            health =
-                enemy.AddComponent<EnemyHealth>();
-        }
+        // ================================================================
+        // NAVEGACIÓN
+        // ================================================================
 
+        enemy.AddComponent<EnemyNavigation>();
 
         // ================================================================
         // PERSECUCIÓN
         // ================================================================
 
-        EnemyChase chase =
-            enemy.GetComponent<EnemyChase>();
-
-        if (chase == null)
-        {
-            chase =
-                enemy.AddComponent<EnemyChase>();
-        }
-
+        enemy.AddComponent<EnemyChase>();
 
         Debug.Log(
-            "[SceneSetup] Enemigo de prueba creado."
+            "[SceneSetup] Enemy_Test creado."
         );
     }
-
-
-    // =====================================================================
-    // TRAMPAS DE VENENO
-    // =====================================================================
-
-    private static void CrearTrampasVeneno()
-    {
-        if (
-            GameObject.Find(
-                "PoisonTrap_0"
-            ) != null
-        )
-        {
-            return;
-        }
-
-
-        Vector3[] posiciones =
-        {
-            new Vector3(-6f, 0.02f,  4f),
-            new Vector3( 5f, 0.02f,  5f),
-            new Vector3(-7f, 0.02f, -5f),
-            new Vector3( 6f, 0.02f, -4f),
-            new Vector3( 0f, 0.02f,  7f),
-            new Vector3( 2f, 0.02f, -8f)
-        };
-
-
-        for (int i = 0; i < posiciones.Length; i++)
-        {
-            CrearTrampaVeneno(
-                $"PoisonTrap_{i}",
-                posiciones[i]
-            );
-        }
-    }
-
-
-    private static void CrearTrampaVeneno(
-        string nombre,
-        Vector3 posicion
-    )
-    {
-        GameObject trap =
-            GameObject.CreatePrimitive(
-                PrimitiveType.Cylinder
-            );
-
-
-        trap.name =
-            nombre;
-
-        trap.transform.position =
-            posicion;
-
-        trap.transform.localScale =
-            new Vector3(
-                1.5f,
-                0.02f,
-                1.5f
-            );
-
-
-        Renderer renderer =
-            trap.GetComponent<Renderer>();
-
-
-        if (renderer != null)
-        {
-            Material material =
-                new Material(
-                    Shader.Find(
-                        "Universal Render Pipeline/Lit"
-                    )
-                    ??
-                    Shader.Find("Standard")
-                );
-
-
-            material.color =
-                new Color(
-                    0.55f,
-                    0.05f,
-                    0.75f,
-                    1f
-                );
-
-
-            renderer.sharedMaterial =
-                material;
-        }
-
-
-        Collider collider =
-            trap.GetComponent<Collider>();
-
-
-        if (collider != null)
-        {
-            collider.isTrigger =
-                true;
-        }
-
-
-        PoisonTrap poison =
-            trap.GetComponent<PoisonTrap>();
-
-
-        if (poison == null)
-        {
-            poison =
-                trap.AddComponent<PoisonTrap>();
-        }
-    }
-
-
-    // =====================================================================
-    // TRAMPAS DE FUEGO
-    // =====================================================================
-
-    private static void CrearTrampasFuego()
-    {
-        if (
-            GameObject.Find(
-                "FireTrap_0"
-            ) != null
-        )
-        {
-            return;
-        }
-
-
-        Vector3[] posiciones =
-        {
-            new Vector3(-3f, 0.02f,  6f),
-            new Vector3( 7f, 0.02f,  2f),
-            new Vector3(-5f, 0.02f, -2f),
-            new Vector3( 4f, 0.02f, -7f),
-            new Vector3(-1f, 0.02f, -7f),
-            new Vector3( 7f, 0.02f, -6f)
-        };
-
-
-        for (int i = 0; i < posiciones.Length; i++)
-        {
-            CrearTrampaFuego(
-                $"FireTrap_{i}",
-                posiciones[i]
-            );
-        }
-    }
-
-
-    private static void CrearTrampaFuego(
-        string nombre,
-        Vector3 posicion
-    )
-    {
-        GameObject trap =
-            GameObject.CreatePrimitive(
-                PrimitiveType.Cylinder
-            );
-
-
-        trap.name =
-            nombre;
-
-        trap.transform.position =
-            posicion;
-
-
-        float escala =
-            Random.Range(
-                0.8f,
-                1.1f
-            );
-
-
-        trap.transform.localScale =
-            new Vector3(
-                1.2f * escala,
-                0.02f,
-                1.2f * escala
-            );
-
-
-        trap.transform.rotation =
-            Quaternion.Euler(
-                0f,
-                Random.Range(
-                    0f,
-                    360f
-                ),
-                0f
-            );
-
-
-        Renderer renderer =
-            trap.GetComponent<Renderer>();
-
-
-        if (renderer != null)
-        {
-            Material material =
-                new Material(
-                    Shader.Find(
-                        "Universal Render Pipeline/Lit"
-                    )
-                    ??
-                    Shader.Find("Standard")
-                );
-
-
-            material.color =
-                new Color(
-                    1f,
-                    0.18f,
-                    0.02f,
-                    1f
-                );
-
-
-            renderer.sharedMaterial =
-                material;
-        }
-
-
-        Collider collider =
-            trap.GetComponent<Collider>();
-
-
-        if (collider != null)
-        {
-            collider.isTrigger =
-                true;
-        }
-
-
-        FireTrap fire =
-            trap.GetComponent<FireTrap>();
-
-
-        if (fire == null)
-        {
-            fire =
-                trap.AddComponent<FireTrap>();
-        }
-    }
-
 
     // =====================================================================
     // CÁMARA
     // =====================================================================
 
-    private static void ConfigurarCamara(
+    private void ConfigurarCamara(
         GameObject player
     )
     {
-        Camera mainCam =
+        Camera mainCamera =
             Camera.main;
 
-
-        if (mainCam == null)
+        if (mainCamera == null)
         {
-            GameObject camObj =
+            GameObject cameraObject =
                 new GameObject(
                     "Main Camera"
                 );
 
-
-            camObj.tag =
+            cameraObject.tag =
                 "MainCamera";
 
+            mainCamera =
+                cameraObject.AddComponent<Camera>();
 
-            mainCam =
-                camObj.AddComponent<Camera>();
-
-
-            camObj.AddComponent<AudioListener>();
+            cameraObject.AddComponent<AudioListener>();
         }
 
-
-        mainCam.transform.position =
+        mainCamera.transform.position =
             new Vector3(
                 0f,
-                7f,
+                10f,
                 -10f
             );
 
-
-        mainCam.transform.rotation =
+        mainCamera.transform.rotation =
             Quaternion.Euler(
                 35f,
                 0f,
                 0f
             );
 
-
         CameraFollow cameraFollow =
-            mainCam.GetComponent<CameraFollow>();
-
+            mainCamera.GetComponent<CameraFollow>();
 
         if (cameraFollow == null)
         {
             cameraFollow =
-                mainCam.gameObject
-                    .AddComponent<CameraFollow>();
+                mainCamera.gameObject.AddComponent<CameraFollow>();
         }
-
 
         if (player != null)
         {
@@ -758,191 +484,71 @@ public class SceneSetup : MonoBehaviour
                 player.transform
             );
         }
-    }
-
-
-    // =====================================================================
-    // CHECKPOINTS
-    // =====================================================================
-
-    private static void CrearCheckpoints()
-    {
-        if (
-            GameObject.Find(
-                "Checkpoint_0"
-            ) != null
-        )
-        {
-            return;
-        }
-
-
-        GameObject ground =
-            GameObject.Find(
-                "Suelo_Ground"
-            );
-
-
-        if (ground == null)
-        {
-            Debug.LogWarning(
-                "[SceneSetup] No se encontró el suelo para crear checkpoints."
-            );
-
-            return;
-        }
-
-
-        StageBounds bounds =
-            ground.GetComponent<StageBounds>();
-
-
-        if (bounds == null)
-        {
-            Debug.LogWarning(
-                "[SceneSetup] No se encontró StageBounds para crear checkpoints."
-            );
-
-            return;
-        }
-
-
-        Bounds playBounds =
-            bounds.GetPlayAreaBounds();
-
-
-        float margin =
-            2.5f;
-
-
-        float xMin =
-            playBounds.min.x + margin;
-
-        float xMax =
-            playBounds.max.x - margin;
-
-        float zMin =
-            playBounds.min.z + margin;
-
-        float zMax =
-            playBounds.max.z - margin;
-
-
-        Vector3[] posiciones =
-        {
-            new Vector3(
-                xMin,
-                0.04f,
-                zMin
-            ),
-
-            new Vector3(
-                xMax,
-                0.04f,
-                zMin
-            ),
-
-            new Vector3(
-                xMin,
-                0.04f,
-                zMax
-            ),
-
-            new Vector3(
-                xMax,
-                0.04f,
-                zMax
-            )
-        };
-
-
-        for (
-            int i = 0;
-            i < posiciones.Length;
-            i++
-        )
-        {
-            CrearCheckpoint(
-                $"Checkpoint_{i}",
-                posiciones[i]
-            );
-        }
-
 
         Debug.Log(
-            "[SceneSetup] 4 checkpoints creados."
+            "[SceneSetup] Cámara configurada."
         );
     }
 
+    // =====================================================================
+    // HUD
+    // =====================================================================
 
-    private static void CrearCheckpoint(
-        string nombre,
-        Vector3 posicion
-    )
+    private void CrearHUD()
     {
-        GameObject checkpoint =
-            GameObject.CreatePrimitive(
-                PrimitiveType.Cube
-            );
+        // ================================================================
+        // HEALTH UI
+        // ================================================================
 
+        HealthUI healthUI =
+            FindAnyObjectByType<HealthUI>();
 
-        checkpoint.name =
-            nombre;
-
-
-        checkpoint.transform.position =
-            posicion;
-
-
-        checkpoint.transform.localScale =
-            new Vector3(
-                1.5f,
-                0.04f,
-                1.5f
-            );
-
-
-        Renderer renderer =
-            checkpoint.GetComponent<Renderer>();
-
-
-        if (renderer != null)
+        if (healthUI == null)
         {
-            Material material =
-                new Material(
-                    Shader.Find(
-                        "Universal Render Pipeline/Unlit"
-                    )
-                    ??
-                    Shader.Find("Standard")
+            GameObject healthObject =
+                new GameObject(
+                    "HealthUI"
                 );
 
+            healthObject.AddComponent<HealthUI>();
+        }
 
-            material.color =
-                new Color(
-                    0.1f,
-                    1f,
-                    0.2f,
-                    1f
+        // ================================================================
+        // DASH UI
+        // ================================================================
+
+        DashUI dashUI =
+            FindAnyObjectByType<DashUI>();
+
+        if (dashUI == null)
+        {
+            GameObject dashObject =
+                new GameObject(
+                    "DashUI"
                 );
 
-
-            renderer.sharedMaterial =
-                material;
+            dashObject.AddComponent<DashUI>();
         }
 
+        // ================================================================
+        // DAMAGE FEEDBACK UI
+        // ================================================================
 
-        BoxCollider collider =
-            checkpoint.GetComponent<BoxCollider>();
+        DamageFeedbackUI damageFeedback =
+            FindAnyObjectByType<DamageFeedbackUI>();
 
-
-        if (collider != null)
+        if (damageFeedback == null)
         {
-            collider.isTrigger =
-                true;
+            GameObject damageObject =
+                new GameObject(
+                    "DamageFeedbackUI"
+                );
+
+            damageObject.AddComponent<DamageFeedbackUI>();
         }
 
-
-        checkpoint.AddComponent<Checkpoint>();
+        Debug.Log(
+            "[SceneSetup] HUD y feedback visual configurados."
+        );
     }
 }

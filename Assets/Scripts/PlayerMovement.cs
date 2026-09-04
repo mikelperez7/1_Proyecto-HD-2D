@@ -1,166 +1,147 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// Controlador de movimiento en 8 direcciones para un personaje estilo HD-2D.
-/// Utiliza el nuevo sistema de entradas de Unity (Input System Package) mediante Keyboard y Gamepad,
-/// así como un Rigidbody 3D para la física del personaje en un plano XZ.
-/// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Configuración de Movimiento")]
-    [Tooltip("Velocidad máxima de desplazamiento del jugador.")]
+
     [SerializeField] private float moveSpeed = 6f;
 
-    [Tooltip("Tasa de aceleración al iniciar el movimiento.")]
     [SerializeField] private float acceleration = 50f;
 
-    [Tooltip("Tasa de desaceleración/frenado al soltar los controles.")]
     [SerializeField] private float deceleration = 60f;
 
     [Header("Configuración HD-2D / Cámara")]
-    [Tooltip("Ajusta el movimiento de forma relativa a la vista de la cámara activa.")]
+
     [SerializeField] private bool alignWithCamera = true;
 
-    [Tooltip("Referencia a la cámara principal. Si no se asigna, se detectará automáticamente.")]
     [SerializeField] private Camera mainCamera;
 
     [Header("Configuración de Sprite")]
-    [Tooltip("Invierte la orientación del SpriteRenderer horizontalmente según la dirección.")]
+
     [SerializeField] private bool flipSpriteOnDirection = true;
 
-    [Tooltip("Referencia al SpriteRenderer del personaje (opcional, buscado en este objeto o hijos si no se asigna).")]
     [SerializeField] private SpriteRenderer spriteRenderer;
 
-    // Componentes e identificadores internos
     private Rigidbody rb;
+
     private Vector2 inputVector;
+
     private Vector3 targetVelocity;
-    private Vector3 lastNonZeroDirection = Vector3.forward;
 
+    private Vector3 lastNonZeroDirection =
+        Vector3.forward;
 
-    // =====================================================================
-    // PROPIEDADES
-    // =====================================================================
+    private Vector3 wallNormal;
 
-    /// <summary>
-    /// Velocidad máxima normal del jugador.
-    /// </summary>
-    public float MoveSpeed =>
-        moveSpeed;
+    private bool touchingWall;
 
+    private Collider currentWallCollider;
 
-    /// <summary>
-    /// Propiedad pública para consultar el vector de dirección actual normalizado.
-    /// </summary>
+    public float MoveSpeed => moveSpeed;
+
     public Vector3 Direction =>
         lastNonZeroDirection;
 
-
-    /// <summary>
-    /// Propiedad pública para consultar si el personaje se encuentra actualmente en movimiento.
-    /// </summary>
     public bool IsMoving =>
         inputVector.sqrMagnitude > 0.01f;
 
-
     private void Awake()
     {
-        // Obtención de referencias principales
-        rb = GetComponent<Rigidbody>();
+        rb =
+            GetComponent<Rigidbody>();
 
         if (spriteRenderer == null)
         {
-            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            spriteRenderer =
+                GetComponentInChildren<SpriteRenderer>();
         }
 
         if (mainCamera == null)
         {
-            mainCamera = Camera.main;
+            mainCamera =
+                Camera.main;
         }
 
         ConfigurarRigidbody();
     }
 
-
     private void Start()
     {
         if (mainCamera == null)
         {
-            mainCamera = Camera.main;
+            mainCamera =
+                Camera.main;
         }
     }
-
 
     private void Update()
     {
         ProcesarEntradaNewInputSystem();
+
         ActualizarOrientacionSprite();
     }
-
 
     private void FixedUpdate()
     {
         MoverJugador();
     }
 
-
-    /// <summary>
-    /// Configura las propiedades iniciales del Rigidbody para garantizar
-    /// un comportamiento físico estable estilo 2.5D / HD-2D.
-    /// </summary>
     private void ConfigurarRigidbody()
     {
-        if (rb != null)
-        {
-            // Congelar rotaciones en X, Y, Z para que el personaje no se vuelque al colisionar
-            rb.constraints =
-                RigidbodyConstraints.FreezeRotationX |
-                RigidbodyConstraints.FreezeRotationY |
-                RigidbodyConstraints.FreezeRotationZ;
+        if (rb == null)
+            return;
 
-            // Interpolación para un movimiento visual suave en pantalla
-            rb.interpolation =
-                RigidbodyInterpolation.Interpolate;
+        rb.constraints =
+            RigidbodyConstraints.FreezeRotationX |
+            RigidbodyConstraints.FreezeRotationY |
+            RigidbodyConstraints.FreezeRotationZ;
 
-            // Detección continua de colisiones para evitar traspasos
-            rb.collisionDetectionMode =
-                CollisionDetectionMode.Continuous;
-        }
+        rb.interpolation =
+            RigidbodyInterpolation.Interpolate;
+
+        rb.collisionDetectionMode =
+            CollisionDetectionMode.Continuous;
     }
 
-
-    /// <summary>
-    /// Captura las entradas utilizando la API del nuevo Input System (Keyboard y Gamepad activos).
-    /// Elimina por completo las llamadas obsoletas a UnityEngine.Input.GetAxisRaw.
-    /// </summary>
     private void ProcesarEntradaNewInputSystem()
     {
         float moveX = 0f;
         float moveZ = 0f;
 
-        // 1. Lectura del Teclado (WASD y Flechas de dirección)
-        Keyboard keyboard = Keyboard.current;
+        Keyboard keyboard =
+            Keyboard.current;
 
         if (keyboard != null)
         {
-            if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
+            if (keyboard.wKey.isPressed ||
+                keyboard.upArrowKey.isPressed)
+            {
                 moveZ += 1f;
+            }
 
-            if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
+            if (keyboard.sKey.isPressed ||
+                keyboard.downArrowKey.isPressed)
+            {
                 moveZ -= 1f;
+            }
 
-            if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
+            if (keyboard.dKey.isPressed ||
+                keyboard.rightArrowKey.isPressed)
+            {
                 moveX += 1f;
+            }
 
-            if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
+            if (keyboard.aKey.isPressed ||
+                keyboard.leftArrowKey.isPressed)
+            {
                 moveX -= 1f;
+            }
         }
 
-        // 2. Lectura alternativa desde Gamepad
-        // (Stick Izquierdo / D-Pad) si hay alguno conectado
-        Gamepad gamepad = Gamepad.current;
+        Gamepad gamepad =
+            Gamepad.current;
 
         if (gamepad != null)
         {
@@ -188,23 +169,17 @@ public class PlayerMovement : MonoBehaviour
                 moveZ
             );
 
-        // Normalizar vector para mantener velocidad constante en movimiento diagonal
         if (inputVector.sqrMagnitude > 1f)
         {
             inputVector.Normalize();
         }
     }
 
-
-    /// <summary>
-    /// Aplica las fuerzas y velocidad al Rigidbody basándose en la dirección y la cámara.
-    /// </summary>
     private void MoverJugador()
     {
         Vector3 moveDirection =
             CalcularDireccionMovimiento();
 
-        // Calcular velocidad objetivo en el plano XZ manteniendo la velocidad Y (gravedad)
         targetVelocity =
             moveDirection *
             moveSpeed;
@@ -212,18 +187,39 @@ public class PlayerMovement : MonoBehaviour
         targetVelocity.y =
             rb.linearVelocity.y;
 
-        // Determinar tasa de aceleración o desaceleración según si hay entrada del jugador
+        if (touchingWall)
+        {
+            Vector3 horizontalVelocity =
+                new Vector3(
+                    targetVelocity.x,
+                    0f,
+                    targetVelocity.z
+                );
+
+            horizontalVelocity =
+                Vector3.ProjectOnPlane(
+                    horizontalVelocity,
+                    wallNormal
+                );
+
+            targetVelocity.x =
+                horizontalVelocity.x;
+
+            targetVelocity.z =
+                horizontalVelocity.z;
+        }
+
         float rate =
             (inputVector.sqrMagnitude > 0.01f)
                 ? acceleration
                 : deceleration;
 
-        // Transición fluida hacia la velocidad objetivo
         Vector3 newVelocity =
             Vector3.MoveTowards(
                 rb.linearVelocity,
                 targetVelocity,
-                rate * Time.fixedDeltaTime
+                rate *
+                Time.fixedDeltaTime
             );
 
         newVelocity.y =
@@ -232,7 +228,6 @@ public class PlayerMovement : MonoBehaviour
         rb.linearVelocity =
             newVelocity;
 
-        // Guardar la última dirección de movimiento válida para encarar o animar
         if (moveDirection.sqrMagnitude > 0.01f)
         {
             lastNonZeroDirection =
@@ -240,21 +235,14 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-
-    /// <summary>
-    /// Calcula la dirección 3D del plano XZ considerando si debe ser relativa a la cámara.
-    /// </summary>
-    /// <returns>Vector unitario con la dirección en el espacio 3D.</returns>
     private Vector3 CalcularDireccionMovimiento()
     {
         if (inputVector == Vector2.zero)
-        {
             return Vector3.zero;
-        }
 
-        if (alignWithCamera && mainCamera != null)
+        if (alignWithCamera &&
+            mainCamera != null)
         {
-            // Obtener vectores de dirección de la cámara proyectados en el plano horizontal (XZ)
             Vector3 camForward =
                 mainCamera.transform.forward;
 
@@ -273,7 +261,6 @@ public class PlayerMovement : MonoBehaviour
             ).normalized;
         }
 
-        // Movimiento en ejes del mundo por defecto
         return new Vector3(
             inputVector.x,
             0f,
@@ -281,17 +268,11 @@ public class PlayerMovement : MonoBehaviour
         ).normalized;
     }
 
-
-    /// <summary>
-    /// Maneja el volteo horizontal del SpriteRenderer según la dirección de movimiento.
-    /// </summary>
     private void ActualizarOrientacionSprite()
     {
-        if (
-            !flipSpriteOnDirection ||
+        if (!flipSpriteOnDirection ||
             spriteRenderer == null ||
-            inputVector == Vector2.zero
-        )
+            inputVector == Vector2.zero)
         {
             return;
         }
@@ -303,6 +284,55 @@ public class PlayerMovement : MonoBehaviour
         else if (inputVector.x > 0.01f)
         {
             spriteRenderer.flipX = false;
+        }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        RegistrarPared(collision);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        RegistrarPared(collision);
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        if (collision.collider ==
+            currentWallCollider)
+        {
+            touchingWall = false;
+
+            wallNormal =
+                Vector3.zero;
+
+            currentWallCollider =
+                null;
+        }
+    }
+
+    private void RegistrarPared(Collision collision)
+    {
+        foreach (ContactPoint contact in collision.contacts)
+        {
+            Vector3 normal =
+                contact.normal;
+
+            // Una pared tiene una normal principalmente horizontal.
+            // El suelo queda excluido.
+            if (Mathf.Abs(normal.y) < 0.5f)
+            {
+                wallNormal =
+                    normal.normalized;
+
+                touchingWall = true;
+
+                currentWallCollider =
+                    collision.collider;
+
+                return;
+            }
         }
     }
 }
